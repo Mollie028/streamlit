@@ -24,6 +24,10 @@ if img_files:
             try:
                 files = {"file": (img_file.name, img_file.getvalue(), img_file.type)}
                 res = requests.post(f"{API_BASE}/ocr", files=files)
+                
+                st.write("✅ API 回應碼：", res.status_code)
+                st.write("✅ API 回應內容：", res.text
+                
                 res.raise_for_status()
                 text = res.json().get("text", "")
                 st.text_area(f"📄 {img_file.name} 辨識結果", value=text, height=150)
