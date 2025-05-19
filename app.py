@@ -46,6 +46,7 @@ audio = audio_recorder()
 
 if audio:
     st.audio(audio, format="audio/wav")
+    st.write("✅ 錄音長度（bytes）：", len(audio))
     with st.spinner("🔊 Whisper 語音辨識中..."):
         try:
             st.write("檔案大小（bytes）：", len(audio))
