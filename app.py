@@ -48,9 +48,9 @@ if audio:
     st.audio(audio, format="audio/wav")
     with st.spinner("🔊 Whisper 語音辨識中..."):
         try:
-            st.write("檔案名稱：", img_file.name)
-            st.write("檔案類型：", img_file.type)
-            st.write("檔案大小（bytes）：", len(img_file.getvalue()))
+            st.write("檔案名稱：", audio.name)
+            st.write("檔案類型：", audio.type)
+            st.write("檔案大小（bytes）：", len(audio.getvalue()))
             
             files = {"file": ("audio.wav", audio, "audio/wav")}
             res = requests.post(f"{API_BASE}/whisper", files=files)
