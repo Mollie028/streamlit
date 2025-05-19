@@ -22,6 +22,10 @@ if img_files:
         st.image(img_file, caption=f"預覽：{img_file.name}", use_container_width=True)
         with st.spinner(f"🔍 OCR 辨識中：{img_file.name}"):
             try:
+                st.write("檔案名稱：", img_file.name)
+                st.write("檔案類型：", img_file.type)
+                st.write("檔案大小（bytes）：", len(img_file.getvalue()))
+                
                 files = {"file": (img_file.name, img_file.getvalue(), img_file.type)}
                 res = requests.post(f"{API_BASE}/ocr", files=files)
                 
