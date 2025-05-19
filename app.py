@@ -26,7 +26,7 @@ if img_files:
                 res = requests.post(f"{API_BASE}/ocr", files=files)
                 
                 st.write("✅ API 回應碼：", res.status_code)
-                st.write("✅ API 回應內容：", res.text
+                st.write("✅ API 回應內容：", res.text)
                 
                 res.raise_for_status()
                 text = res.json().get("text", "")
