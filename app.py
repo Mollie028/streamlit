@@ -24,11 +24,11 @@ if img_files:
              try:
                 files = {"file": (img_file.name, img_file.getvalue(), img_file.type)}
                 res = requests.post(f"{API_BASE}/ocr", files=files)
-
+            
                 st.write("✅ API 回應碼：", res.status_code)
                 st.write("✅ API 回應內容：", res.text)
                 res.raise_for_status()
-
+            
                 text = res.json().get("text", "").strip()
                 if not text:
                     st.warning(f"⚠️ {img_file.name} 沒有辨識出任何文字")
@@ -37,11 +37,9 @@ if img_files:
                         f"📄 {img_file.name} OCR 辨識結果（可修改）",
                         value=text,
                         height=200,
-                        key=f"textarea_{img_file.name}"
                     )
-
-                    if st.button(f"✅ 確認送出 LLaMA 分析", key=f"llama_btn_{img_file.name}"):
-                        with st.spinner("🧠 進行欄位萃取中..."):
+                    if st.button(f"✅ 確認送出 LLaMA 分析：{img_file.name}"):
+                        with st.spinner("🧠 進行正則格式採集..."):
                             try:
                                 payload = {"text": user_input}
                                 llama_res = requests.post(f"{API_BASE}/extract", json=payload)
@@ -50,8 +48,8 @@ if img_files:
                                 st.json(llama_res.json())
                             except Exception as e:
                                 st.error(f"❌ LLaMA 分析失敗：{e}")
-
-           
+            except Exception as e:
+                st.error(f"❌ OCR 發生錯誤：{e}")
 # ------------------------
 # 🎤 語音備註錄音（streamlit-audiorecorder）
 # ------------------------
