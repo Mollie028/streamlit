@@ -35,6 +35,8 @@ if img_files:
                 res.raise_for_status()
                 text = res.json().get("text", "")
                 st.text_area(f"📄 {img_file.name} 辨識結果", value=text, height=150)
+                else:
+                    st.warning(f"⚠️ {img_file.name} 沒有辨識出任何文字（回傳為空）")
             except Exception as e:
                 st.error(f"❌ OCR 發生錯誤：{e}")
 
