@@ -37,10 +37,11 @@ if img_files:
                         f"📄 {img_file.name} OCR 辨識結果（可修改）",
                         value=text,
                         height=200,
+                        key=f"textarea_{img_file.name}"
                     )
 
-                    if st.button(f"✅ 確認送出 LLaMA 分析：{img_file.name}"):
-                        with st.spinner("🧠 進行正則格式採集..."):
+                    if st.button(f"✅ 確認送出 LLaMA 分析", key=f"llama_btn_{img_file.name}"):
+                        with st.spinner("🧠 進行欄位萃取中..."):
                             try:
                                 payload = {"text": user_input}
                                 llama_res = requests.post(f"{API_BASE}/extract", json=payload)
