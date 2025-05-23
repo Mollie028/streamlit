@@ -51,8 +51,7 @@ if img_files:
                             except Exception as e:
                                 st.error(f"❌ LLaMA 分析失敗：{e}")
 
-            except Exception as e:
-                st.error(f"❌ OCR 發生錯誤：{e}")
+           
 # ------------------------
 # 🎤 語音備註錄音（streamlit-audiorecorder）
 # ------------------------
