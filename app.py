@@ -21,26 +21,37 @@ if img_files:
     for img_file in img_files:
         st.image(img_file, caption=f"預覽：{img_file.name}", use_container_width=True)
         with st.spinner(f"🔍 OCR 辨識中：{img_file.name}"):
-            try:
-                st.write("檔案名稱：", img_file.name)
-                st.write("檔案類型：", img_file.type)
-                st.write("檔案大小（bytes）：", len(img_file.getvalue()))
-                
+             try:
                 files = {"file": (img_file.name, img_file.getvalue(), img_file.type)}
                 res = requests.post(f"{API_BASE}/ocr", files=files)
-                
+
                 st.write("✅ API 回應碼：", res.status_code)
                 st.write("✅ API 回應內容：", res.text)
-                
                 res.raise_for_status()
-                text = res.json().get("text", "")
 
-                st.text_area(f"📄 {img_file.name} 辨識結果", value=text, height=150)
+                text = res.json().get("text", "").strip()
+                if not text:
+                    st.warning(f"⚠️ {img_file.name} 沒有辨識出任何文字")
                 else:
-                    st.warning(f"⚠️ {img_file.name} 沒有辨識出任何文字（回傳為空）")
+                    user_input = st.text_area(
+                        f"📄 {img_file.name} OCR 辨識結果（可修改）",
+                        value=text,
+                        height=200,
+                    )
+
+                    if st.button(f"✅ 確認送出 LLaMA 分析：{img_file.name}"):
+                        with st.spinner("🧠 進行正則格式採集..."):
+                            try:
+                                payload = {"text": user_input}
+                                llama_res = requests.post(f"{API_BASE}/extract", json=payload)
+                                llama_res.raise_for_status()
+                                st.success("✅ LLaMA 採集結果：")
+                                st.json(llama_res.json())
+                            except Exception as e:
+                                st.error(f"❌ LLaMA 分析失敗：{e}")
+
             except Exception as e:
                 st.error(f"❌ OCR 發生錯誤：{e}")
-
 # ------------------------
 # 🎤 語音備註錄音（streamlit-audiorecorder）
 # ------------------------
