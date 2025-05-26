@@ -29,7 +29,10 @@ if img_files:
                 st.write("✅ API 回應內容：", res.text)
                 res.raise_for_status()
 
-                text = res.json().get("text", "").strip()
+                ocr_response = res.json()
+                text = ocr_response.get("text", "").strip()
+                record_id = ocr_response.get("id")  # ✅ 抓出 OCR 回傳的 id
+
                 if not text:
                     st.warning(f"⚠️ {img_file.name} 沒有辨識出任何文字")
                 else:
@@ -41,7 +44,10 @@ if img_files:
                     if st.button(f"✅ 確認送出 LLaMA 分析：{img_file.name}", key=img_file.name):
                         with st.spinner("進行資料萃取..."):
                             try:
-                                payload = {"text": user_input}
+                                payload = {
+                                    "text": user_input,
+                                    "id": record_id  # ✅ 加入 id
+                                }
                                 llama_res = requests.post(f"{API_BASE}/extract", json=payload)
                                 llama_res.raise_for_status()
                                 st.success("✅ LLaMA 採集結果：")
