@@ -19,7 +19,7 @@ img_files = st.file_uploader(
 
 if img_files:
     for img_file in img_files:
-        st.image(img_file, caption=f"預覽：{img_file.name}", use_container_width=True)
+        st.image(img_file, caption=f"預覽：{img_file.name}", use_container_width=300)
         with st.spinner(f"🔍 OCR 辨識中：{img_file.name}"):
             try:
                 files = {"file": (img_file.name, img_file.getvalue(), img_file.type)}
