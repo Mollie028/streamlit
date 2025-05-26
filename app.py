@@ -4,8 +4,8 @@ from audio_recorder_streamlit import audio_recorder
 
 API_BASE = "https://ocr-whisper-api-production-03e9.up.railway.app"
 
-st.set_page_config(page_title="📇 名片辨識系統", layout="centered")
-st.title("📇 名片辨識 + 語音備註系統")
+st.set_page_config(page_title="名片辨識系統", layout="centered")
+st.title("名片辨識 + 語音備註系統")
 
 # ------------------------
 # 📄 上傳多張名片圖片
@@ -39,7 +39,7 @@ if img_files:
                         height=200,
                     )
                     if st.button(f"✅ 確認送出 LLaMA 分析：{img_file.name}", key=img_file.name):
-                        with st.spinner("🧠 進行正則格式採集..."):
+                        with st.spinner("進行資料萃取..."):
                             try:
                                 payload = {"text": user_input}
                                 llama_res = requests.post(f"{API_BASE}/extract", json=payload)
@@ -53,14 +53,14 @@ if img_files:
 # ------------------------
 # 🎤 語音備註錄音（streamlit-audiorecorder）
 # ------------------------
-st.header("🎤 語音備註錄音")
+st.header("語音備註錄音")
 audio = audio_recorder()
 
 if audio:
     st.audio(audio, format="audio/wav")
     st.write("✅ 錄音長度（bytes）：", len(audio))
 
-    with st.spinner("🔊 Whisper 語音辨識中..."):
+    with st.spinner("Whisper 語音辨識中..."):
         try:
             files = {"file": ("audio.wav", audio, "audio/wav")}
             res = requests.post(f"{API_BASE}/whisper", files=files)
@@ -70,4 +70,4 @@ if audio:
         except Exception as e:
             st.error(f"❌ Whisper 發生錯誤：{e}")
 
-st.write("🚀 App 啟動成功！")
+st.write("App 啟動成功！")
