@@ -60,7 +60,7 @@ if img_files:
 # 🎤 語音備註錄音（streamlit-audiorecorder）
 # ------------------------
 st.header("語音備註錄音")
-st.info("🟢 點下錄音後請停一秒再開始講話，建議語音 3 秒以上。")
+st.info("建議語音 3 秒以上")
 
 # 初始化 session_state 狀態
 if "recorded" not in st.session_state:
@@ -89,7 +89,7 @@ else:
 
     with col2:
         if st.button("✅ 傳送語音辨識"):
-            with st.spinner("🧠 Whisper 語音辨識中..."):
+            with st.spinner(" Whisper 語音辨識中..."):
                 try:
                     files = {
                         "file": ("audio.wav", st.session_state.audio_data, "audio/wav")
