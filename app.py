@@ -74,9 +74,25 @@ if "transcript" not in st.session_state:
 if not st.session_state.recorded:
     audio = audio_recorder()
     if audio:
-        st.session_state.audio_data = audio
-        st.session_state.recorded = True
-        st.success("✅ 錄音完成！你可以播放或送出辨識。")
+        audio_len = len(audio)
+
+        # 判斷錄音狀態
+        if audio_len < 2000:
+            st.error("⛔ 錄音檔為空，沒有錄到任何聲音，請確認麥克風已啟用。")
+            st.stop()
+
+        elif audio_len < 8000:
+            st.warning("⚠️ 錄音時間太短（小於 3 秒），請多講一點再試一次。")
+            st.stop()
+
+        elif audio_len > 2_000_000:
+            st.warning("⚠️ 錄音時間太長（超過 30 秒），請控制在 10～30 秒內。")
+            st.stop()
+
+        else:
+            st.session_state.audio_data = audio
+            st.session_state.recorded = True
+            st.success("✅ 錄音完成！你可以播放或送出辨識。")
 else:
     st.audio(st.session_state.audio_data, format="audio/wav")
 
