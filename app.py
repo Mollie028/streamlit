@@ -59,21 +59,48 @@ if img_files:
 # ------------------------
 # 🎤 語音備註錄音（streamlit-audiorecorder）
 # ------------------------
-st.header("語音備註錄音")
-audio = audio_recorder()
+st.header("🎤 語音備註錄音")
+st.info("🟢 點下錄音後請停一秒再開始講話，建議語音 3 秒以上。")
 
-if audio:
-    st.audio(audio, format="audio/wav")
-    st.write("✅ 錄音長度（bytes）：", len(audio))
+# 初始化 session_state 狀態
+if "recorded" not in st.session_state:
+    st.session_state.recorded = False
+if "audio_data" not in st.session_state:
+    st.session_state.audio_data = None
+if "transcript" not in st.session_state:
+    st.session_state.transcript = ""
 
-    with st.spinner("Whisper 語音辨識中..."):
-        try:
-            files = {"file": ("audio.wav", audio, "audio/wav")}
-            res = requests.post(f"{API_BASE}/whisper", files=files)
-            res.raise_for_status()
-            transcript = res.json().get("text", "")
-            st.text_area("📝 語音辨識結果", value=transcript, height=150)
-        except Exception as e:
-            st.error(f"❌ Whisper 發生錯誤：{e}")
+# 錄音階段
+if not st.session_state.recorded:
+    audio = audio_recorder()
+    if audio:
+        st.session_state.audio_data = audio
+        st.session_state.recorded = True
+        st.success("✅ 錄音完成！你可以播放或送出辨識。")
+else:
+    st.audio(st.session_state.audio_data, format="audio/wav")
 
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        if st.button("🔁 重新錄音"):
+            st.session_state.recorded = False
+            st.session_state.audio_data = None
+            st.session_state.transcript = ""
+
+    with col2:
+        if st.button("✅ 傳送語音辨識"):
+            with st.spinner("🧠 Whisper 語音辨識中..."):
+                try:
+                    files = {
+                        "file": ("audio.wav", st.session_state.audio_data, "audio/wav")
+                    }
+                    res = requests.post(f"{API_BASE}/whisper", files=files)
+                    res.raise_for_status()
+                    st.session_state.transcript = res.json().get("text", "")
+                    st.success("✅ Whisper 辨識成功！")
+                except Exception as e:
+                    st.error(f"❌ Whisper 發生錯誤：{e}")
+
+if st.session_state.transcript:
+    st.text_area("📝 語音辨識結果", value=st.session_state.transcript, height=150)
 st.write("App 啟動成功！")
