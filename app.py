@@ -21,7 +21,7 @@ if "token" not in st.session_state:
         if res.status_code == 200:
             st.session_state.token = res.json()["access_token"]
             st.success("登入成功，重新整理中…")
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error("登入失敗，請再確認帳號密碼")
     st.stop()
