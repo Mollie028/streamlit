@@ -18,16 +18,20 @@ with st.spinner("🔐 讀取使用者資料中..."):
             headers={"Authorization": f"Bearer {access_token}"}
         )
         user = response.json()
-        st.success(f"👤 歡迎登入：{user['username']}")
+        st.success(f"歡迎登入：{user['username']}")
 
-        # 🎯 根據角色顯示對應頁面
-    role = user.get("role", "user")
-    if role == "admin":
-        st.info("🔧 管理員功能區塊")
-        st.write("✅ 帳號管理、刪除功能、匯出功能等")
+    if user.get("role") == "admin":
+        st.success("管理員登入成功")
+        # 顯示管理功能
+        st.page_link("pages/帳戶管理.py", label="帳戶管理", icon="🛠️")
+        st.page_link("pages/資料匯出.py", label="📤 資料匯出")
+        # 其他 admin 專屬功能
+    
     else:
-        st.info("🧑‍💻 一般使用者功能區")
-        st.write("🔍 可使用查詢、拍照、語音備註...")
+        st.info("一般使用者登入成功")
+        st.page_link("pages/名片拍照.py", label="📷 名片拍照")
+        st.page_link("pages/語音備註.py", label="🎤 語音備註")
+        st.page_link("pages/結果回顧.py", label="📖 結果回顧")
 
 
     except Exception as e:
