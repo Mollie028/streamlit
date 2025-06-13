@@ -24,22 +24,23 @@ with st.spinner("🔐 讀取使用者資料中..."):
         role = user.get("role")
 
         st.session_state["role"] = role  # 存下角色供其他頁使用
+        st.session_state["username"] = username
 
-        st.success(f"👤 歡迎登入：{username}")
+        st.success(f"👤 歡迎登入：{username}（{role}）")
 
-        # 顯示管理員功能區塊
+        # 👉 管理員功能區塊
         if role == "admin":
             st.info("🛠️ 管理員功能")
-            st.write("🔐 帳號管理")
-            st.write("📤 資料匯出")
-            st.write("🗑️ 名片刪除")
+            st.page_link("pages/帳號管理.py", label="🔐 帳號管理", icon="🔐")
+            st.page_link("pages/資料匯出.py", label="📤 資料匯出", icon="📤")
+            st.page_link("pages/名片刪除.py", label="🗑️ 名片刪除", icon="🗑️")
 
-        # 顯示一般使用者功能區塊
+        # 👉 一般使用者功能區塊
         else:
             st.info("🧑‍💻 一般使用者功能")
-            st.write("📷 拍照上傳名片")
-            st.write("🎤 錄音語音備註")
-            st.write("🔍 名片查詢")
+            st.page_link("pages/名片上傳.py", label="📷 拍照上傳名片", icon="📷")
+            st.page_link("pages/語音備註.py", label="🎤 錄音語音備註", icon="🎤")
+            st.page_link("pages/名片查詢.py", label="🔍 名片查詢", icon="🔍")
 
     except Exception as e:
         st.error(f"❌ 無法取得使用者資訊：{e}")
