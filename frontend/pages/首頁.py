@@ -28,19 +28,19 @@ with st.spinner("🔐 讀取使用者資料中..."):
 
         st.success(f"👤 歡迎登入：{username}（{role}）")
 
-        # 👉 管理員功能區塊
+        # 顯示管理員功能區塊
         if role == "admin":
             st.info("🛠️ 管理員功能")
-            st.page_link("pages/帳號管理.py", label="🔐 帳號管理", icon="🔐")
-            st.page_link("pages/資料匯出.py", label="📤 資料匯出", icon="📤")
+            st.page_link("pages/帳號管理.py", label="🔐 帳號管理", icon="🧑")
+            st.page_link("pages/資料匯出.py", label="📤 資料匯出", icon="📦")
             st.page_link("pages/名片刪除.py", label="🗑️ 名片刪除", icon="🗑️")
 
-        # 👉 一般使用者功能區塊
+        # 顯示一般使用者功能區塊
         else:
             st.info("🧑‍💻 一般使用者功能")
-            st.page_link("pages/名片上傳.py", label="📷 拍照上傳名片", icon="📷")
-            st.page_link("pages/語音備註.py", label="🎤 錄音語音備註", icon="🎤")
-            st.page_link("pages/名片查詢.py", label="🔍 名片查詢", icon="🔍")
+            st.page_link("pages/名片拍照.py", label="📷 拍照上傳名片", icon="📸")
+            st.page_link("pages/語音備註.py", label="🎤 錄音語音備註", icon="🎙️")
+            st.page_link("pages/結果回顧.py", label="🔍 名片查詢", icon="🔍")
 
     except Exception as e:
         st.error(f"❌ 無法取得使用者資訊：{e}")
