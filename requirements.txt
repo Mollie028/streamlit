@@ -1,5 +1,4 @@
-streamlit
+streamlit>=1.32
 requests
 pillow
 audio-recorder-streamlit
-streamlit-extras
