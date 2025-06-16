@@ -9,7 +9,7 @@ st.set_page_config(page_title="名片辨識登入", page_icon="🔐")
 
 # ✅ 如果已經登入就自動導向首頁
 if st.session_state.get("access_token"):
-    st.switch_page("首頁")  # ✅ 頁面標題要 match 頁面 .py 的 set_page_config
+    st.page_link("首頁", label="👉 前往首頁", icon="🏠")
     st.stop()
 
 # ✅ 登入頁面內容
