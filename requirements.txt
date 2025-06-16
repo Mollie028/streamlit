@@ -1,5 +1,5 @@
-streamlit==1.24.1
+streamlit
 requests
 pillow
 audio-recorder-streamlit
-streamlit-extras==0.3.5
+streamlit-extras
