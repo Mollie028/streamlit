@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+from streamlit_extras.switch_page_button import switch_page
 from audio_recorder_streamlit import audio_recorder
 
 # ─── 後端 API 基礎網址 ───────────────────────────────
@@ -7,6 +8,9 @@ API_BASE = "https://ocr-whisper-api-production-03e9.up.railway.app"
 
 # ─── 頁面設定 ───────────────────────────────────────
 st.set_page_config(page_title="名片辨識系統", layout="centered")
+
+if st.session_state.get("access_token") and st.runtime.exists():
+    switch_page("首頁")
 
 # ─── 登入邏輯：未登入前只顯示登入畫面 ─────────────────
 if "token" not in st.session_state:
