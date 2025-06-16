@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 
-st.set_page_config(page_title="登入後首頁", page_icon="🏠")
+st.set_page_config(page_title="首頁", page_icon="🏠")
 
 # 取得登入後儲存的 access_token
 access_token = st.session_state.get("access_token", None)
