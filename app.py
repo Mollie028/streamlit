@@ -10,8 +10,9 @@ API_BASE = "https://ocr-whisper-api-production-03e9.up.railway.app"
 st.set_page_config(page_title="名片辨識系統", layout="centered")
 
 # ✅ 登入後自動跳轉首頁（避免重複登入）
-if st.session_state.get("token"):
-    switch_page("首頁")
+if st.session_state.get("access_token"):
+    st.page_link("pages/首頁.py", label="👉 前往首頁")
+    st.stop()
 
 # ✅ 尚未登入 → 顯示登入頁面
 st.title("🔐 請先登入")
