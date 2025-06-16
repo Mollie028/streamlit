@@ -1,36 +1,38 @@
 import streamlit as st
 import requests
 
+# ✅ 後端 API URL
 API_BASE = "https://ocr-whisper-api-production-03e9.up.railway.app"
-st.set_page_config(page_title="登入", layout="centered")
 
-# ✅ 如果已經登入，自動跳轉首頁
+# ✅ 畫面設定
+st.set_page_config(page_title="名片辨識登入", page_icon="🔐")
+
+# ✅ 如果已經登入就自動導向首頁
 if st.session_state.get("access_token"):
-    st.switch_page("首頁")
+    st.switch_page("首頁")  # ✅ 頁面標題要 match 頁面 .py 的 set_page_config
+    st.stop()
 
+# ✅ 登入頁面內容
 st.title("🔐 請先登入")
-user = st.text_input("帳號")
-pwd = st.text_input("密碼", type="password")
+
+username = st.text_input("帳號")
+password = st.text_input("密碼", type="password")
 
 if st.button("登入"):
-    res = requests.post(f"{API_BASE}/login", json={"username": user, "password": pwd})
-    if res.status_code == 200:
-        token = res.json()["access_token"]
-        st.session_state["access_token"] = token
-
-        # 🔍 再呼叫 /me 拿 role 與 username
-        me = requests.get(
-            f"{API_BASE}/me",
-            headers={"Authorization": f"Bearer {token}"}
+    try:
+        res = requests.post(
+            f"{API_BASE}/login",
+            json={"username": username, "password": password}
         )
-        if me.status_code == 200:
-            user_info = me.json()
-            st.session_state["username"] = user_info.get("username", "")
-            st.session_state["role"] = user_info.get("role", "")
-
-            st.success("✅ 登入成功，正在導向...")
-            st.rerun()  
+        if res.status_code == 200:
+            access_token = res.json().get("access_token")
+            if access_token:
+                st.session_state["access_token"] = access_token
+                st.success("✅ 登入成功，正在導向首頁...")
+                st.experimental_rerun()  # ✅ 登入成功重新載入一次 → 觸發上方 switch_page()
+            else:
+                st.error("❌ 後端未傳回 access_token")
         else:
-            st.error("❌ 無法取得使用者資訊")
-    else:
-        st.error("❌ 登入失敗，請確認帳密是否正確")
+            st.error("❌ 登入失敗，請檢查帳號密碼")
+    except Exception as e:
+        st.error(f"🚨 無法登入：{e}")
