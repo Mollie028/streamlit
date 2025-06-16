@@ -29,7 +29,7 @@ if st.button("登入"):
             st.session_state["role"] = user_info.get("role", "")
 
             st.success("✅ 登入成功，正在導向...")
-            st.experimental_rerun()  # 重新載入觸發 switch_page
+            st.rerun()  
         else:
             st.error("❌ 無法取得使用者資訊")
     else:
