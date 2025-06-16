@@ -9,7 +9,7 @@ API_URL = "https://ocr-whisper-api-production-03e9.up.railway.app"
 
 # ✅ 如果登入成功過，直接轉跳首頁（靠首頁.py 自行顯示內容）
 if st.session_state.get("access_token"):
-    st.switch_page("pages/首頁.py")  # ✅ Streamlit ≥1.31 支援
+    st.switch_page("首頁.py")  # ✅ Streamlit ≥1.31 支援
     st.stop()
 
 # ✅ 登入畫面
@@ -25,7 +25,7 @@ if st.button("登入"):
             if access_token:
                 st.session_state["access_token"] = access_token
                 st.success("✅ 登入成功，正在導向首頁...")
-                st.switch_page("pages/首頁.py")
+                st.switch_page("首頁.py")
             else:
                 st.error("❌ 後端未傳回 access_token")
         else:
