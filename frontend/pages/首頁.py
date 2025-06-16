@@ -1,49 +1,34 @@
 import streamlit as st
 import requests
+from streamlit_extras.switch_page_button import switch_page
 
-st.set_page_config(page_title="首頁", page_icon="🏠")
+st.set_page_config(page_title="名片辨識登入", page_icon="🔐")
 
-# 取得登入後儲存的 access_token
-access_token = st.session_state.get("access_token", None)
-if not access_token:
-    st.warning("⚠️ 尚未登入，請回到主頁")
+API_BASE = "https://ocr-whisper-api-production-03e9.up.railway.app"
+
+# ✅ 如果已登入，就自動跳到「首頁」
+if st.session_state.get("access_token"):
+    switch_page("首頁")
     st.stop()
 
-# 呼叫 /me API 取得使用者資訊
-with st.spinner("🔐 讀取使用者資料中..."):
+# ✅ 顯示登入表單
+st.title("🔐 請先登入")
+username = st.text_input("帳號")
+password = st.text_input("密碼", type="password")
+
+if st.button("登入"):
     try:
-        response = requests.get(
-            "https://ocr-whisper-api-production-03e9.up.railway.app/me",
-            headers={"Authorization": f"Bearer {access_token}"}
+        res = requests.post(
+            f"{API_BASE}/login",
+            json={"username": username, "password": password}
         )
-        response.raise_for_status()
-        user = response.json()
-        username = user.get("username")
-        role = user.get("role")
-
-        st.session_state["role"] = role  # 存下角色供其他頁使用
-        st.session_state["username"] = username
-
-        st.success(f"👤 歡迎登入：{username}（{role}）")
-    
-    # ✅ 管理員功能區塊
-    if role == "admin":
-        st.info("🛠️ 管理員功能")
-        st.page_link("名片拍照", label="📷 拍照上傳名片", icon="📸")
-        st.page_link("語音備註", label="🎤 錄音語音備註", icon="🎙️")
-        st.page_link("查詢名片紀錄", label="🔍 查詢名片紀錄", icon="🔍")
-        st.page_link("帳號管理", label="🔐 帳號管理", icon="🧑")
-        st.page_link("資料匯出", label="📤 資料匯出", icon="📦")
-        st.page_link("名片刪除", label="🗑️ 名片刪除", icon="🗑️")
-    
-    # ✅ 一般使用者功能區塊
-    else:
-        st.info("🧑‍💻 一般使用者功能")
-        st.page_link("名片拍照", label="📷 拍照上傳名片", icon="📸")
-        st.page_link("語音備註", label="🎤 錄音語音備註", icon="🎙️")
-        st.page_link("查詢名片紀錄", label="🔍 查詢名片紀錄", icon="🔍")
-
-
+        if res.status_code == 200:
+            access_token = res.json().get("access_token")
+            st.session_state["access_token"] = access_token
+            st.success("✅ 登入成功，導向首頁...")
+            switch_page("首頁")  # ✅ 中文標題
+        else:
+            st.error("❌ 登入失敗，請檢查帳密")
     except Exception as e:
-        st.error(f"❌ 無法取得使用者資訊：{e}")
-        st.stop()
+        st.error(f"🚨 登入錯誤：{e}")
+ 
