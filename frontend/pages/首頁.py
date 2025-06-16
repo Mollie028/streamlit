@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 from streamlit_extras.switch_page_button import switch_page
 
-st.set_page_config(page_title="名片辨識登入", page_icon="🔐")
+st.set_page_config(page_title="首頁", page_icon="🔐")
 
 API_BASE = "https://ocr-whisper-api-production-03e9.up.railway.app"
 
