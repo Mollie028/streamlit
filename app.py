@@ -1,34 +1,26 @@
 import streamlit as st
 import requests
+from streamlit_extras.switch_page_button import switch_page
 
-# ✅ 畫面設定
+API_BASE = "https://ocr-whisper-api-production-03e9.up.railway.app"
+
 st.set_page_config(page_title="登入", page_icon="🔐")
 
-# ✅ 後端 API URL
-API_URL = "https://ocr-whisper-api-production-03e9.up.railway.app"
-
-# ✅ 如果登入成功過，直接轉跳首頁（靠首頁.py 自行顯示內容）
 if st.session_state.get("access_token"):
-    st.switch_page("首頁")  # ✅ Streamlit ≥1.31 支援
+    switch_page("首頁")  # ✅ 中文檔名 OK，確保你真的有 pages/首頁.py
     st.stop()
 
-# ✅ 登入畫面
-st.title("🔐 名片辨識系統登入")
+st.title("🔐 登入頁面")
+
 username = st.text_input("帳號")
 password = st.text_input("密碼", type="password")
 
 if st.button("登入"):
-    try:
-        res = requests.post(f"{API_URL}/login", json={"username": username, "password": password})
-        if res.status_code == 200:
-            access_token = res.json().get("access_token")
-            if access_token:
-                st.session_state["access_token"] = access_token
-                st.success("✅ 登入成功，正在導向首頁...")
-                st.switch_page("首頁")
-            else:
-                st.error("❌ 後端未傳回 access_token")
-        else:
-            st.error("❌ 登入失敗，請確認帳密是否正確")
-    except Exception as e:
-        st.error(f"🚨 登入錯誤：{e}")
+    res = requests.post(f"{API_BASE}/login", json={"username": username, "password": password})
+    if res.status_code == 200:
+        token = res.json().get("access_token")
+        st.session_state["access_token"] = token
+        st.success("✅ 登入成功，正在跳轉...")
+        switch_page("首頁")  # ✅ 這裡要跟 pages 資料夾裡的 py 檔案完全一致
+    else:
+        st.error("❌ 登入失敗，請確認帳密")
