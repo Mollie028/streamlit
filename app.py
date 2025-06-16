@@ -27,7 +27,7 @@ if st.button("登入"):
             )
             if res.status_code == 200:
                 access_token = res.json()["access_token"]
-                st.session_state["access_token"] = access_token
+                st.session_state["access_token"] = res.json()["access_token"]
                 st.success("✅ 登入成功，前往首頁")
                 switch_page("首頁")
             else:
