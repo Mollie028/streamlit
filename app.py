@@ -6,7 +6,7 @@ st.set_page_config(page_title="登入", layout="centered")
 
 # ✅ 如果已經登入，自動跳轉首頁
 if st.session_state.get("access_token"):
-    st.switch_page("Home")
+    st.switch_page("首頁")
 
 st.title("🔐 請先登入")
 user = st.text_input("帳號")
