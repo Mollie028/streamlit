@@ -29,7 +29,7 @@ if st.button("登入"):
             if access_token:
                 st.session_state["access_token"] = access_token
                 st.success("✅ 登入成功，正在導向首頁...")
-                st.experimental_rerun()  # ✅ 登入成功重新載入一次 → 觸發上方 switch_page()
+                st.rerun()  
             else:
                 st.error("❌ 後端未傳回 access_token")
         else:
