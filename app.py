@@ -2,13 +2,11 @@ import streamlit as st
 import requests
 
 API_BASE = "https://ocr-whisper-api-production-03e9.up.railway.app"
-st.set_page_config(page_title="Login", layout="centered")
+st.set_page_config(page_title="登入", layout="centered")
 
+# ✅ 如果已經登入，自動跳轉首頁
 if st.session_state.get("access_token"):
-    st.success("✅ 已登入，請點下方按鈕前往首頁")
-    if st.button("👉 前往首頁"):
-        st.switch_page("pages/Home.py")
-    st.stop()
+    st.switch_page("pages/Home.py")
 
 st.title("🔐 請先登入")
 user = st.text_input("帳號")
@@ -17,9 +15,22 @@ pwd = st.text_input("密碼", type="password")
 if st.button("登入"):
     res = requests.post(f"{API_BASE}/login", json={"username": user, "password": pwd})
     if res.status_code == 200:
-        st.session_state.access_token = res.json()["access_token"]
-        st.success("✅ 登入成功，請點下方按鈕進入首頁")
-        if st.button("👉 前往首頁"):
-            st.switch_page("pages/Home.py")
+        token = res.json()["access_token"]
+        st.session_state["access_token"] = token
+
+        # 🔍 再呼叫 /me 拿 role 與 username
+        me = requests.get(
+            f"{API_BASE}/me",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        if me.status_code == 200:
+            user_info = me.json()
+            st.session_state["username"] = user_info.get("username", "")
+            st.session_state["role"] = user_info.get("role", "")
+
+            st.success("✅ 登入成功，正在導向...")
+            st.experimental_rerun()  # 重新載入觸發 switch_page
+        else:
+            st.error("❌ 無法取得使用者資訊")
     else:
         st.error("❌ 登入失敗，請確認帳密是否正確")
