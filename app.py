@@ -10,7 +10,7 @@ st.set_page_config(page_title="名片辨識系統", layout="centered")
 # ✅ 已登入就導向首頁按鈕
 if st.session_state.get("access_token"):
     st.success("✅ 已登入，請點下方按鈕前往首頁")
-    st.page_link("首頁", label="👉 前往首頁", icon="🏠")
+    st.page_link(" Home", label="👉 前往首頁", icon="🏠")
     st.stop()
 
 # ✅ 尚未登入：顯示登入畫面
