@@ -1,29 +1,37 @@
 import streamlit as st
-import requests
-from streamlit_extras.switch_page_button import switch_page
 
-st.set_page_config(page_title="登入", page_icon="🔐")
+# 把所有页面都 import 进来
+from frontend.pages import login, home, 名片拍照, 語音備註, 查詢名片紀錄, 帳號管理, 資料匯出, 名片刪除
 
-API = "https://ocr-whisper-api-production-03e9.up.railway.app"
+st.set_page_config("名片辨識系統", "🏷️", layout="centered")
 
-if st.session_state.get("access_token"):
-    switch_page("首頁")
+# 1. 如果还没登录 → 直接渲染 login 页面
+if "access_token" not in st.session_state:
+    login.render()
+    st.stop()
 
-st.title("🔐 登入系統")
-username = st.text_input("帳號")
-password = st.text_input("密碼", type="password")
+# 2. 如果登录了但没有指定 page → 自动跳到 home
+if "page" not in st.session_state:
+    st.session_state.page = "home"
+    # rerun 让下面的逻辑生效
+    st.experimental_rerun()
 
-if st.button("登入"):
-    try:
-        res = requests.post(f"{API}/login", json={"username": username, "password": password})
-        if res.status_code == 200:
-            token = res.json().get("access_token")
-            if token:
-                st.session_state["access_token"] = token
-                switch_page("首頁")
-            else:
-                st.error("❌ 後端未回傳 token")
-        else:
-            st.error("❌ 登入失敗")
-    except Exception as e:
-        st.error(f"🚨 登入錯誤：{e}")
+# 3. 分发到各个页面
+page = st.session_state.page
+if page == "home":
+    home.render()
+elif page == "名片拍照":
+    名片拍照.render()
+elif page == "語音備註":
+    語音備註.render()
+elif page == "查詢名片紀錄":
+    查詢名片紀錄.render()
+elif page == "帳號管理":
+    帳號管理.render()
+elif page == "資料匯出":
+    資料匯出.render()
+elif page == "名片刪除":
+    名片刪除.render()
+else:
+    st.error(f"找不到頁面：{page}")
+
