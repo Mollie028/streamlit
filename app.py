@@ -19,6 +19,9 @@ if st.session_state.get("access_token") and st.session_state.get("role"):
         st.button("📤 資料匯出")
         st.button("🔐 帳號管理")
         st.button("🗑️ 名片刪除")
+        st.button("📷 拍照上傳名片")
+        st.button("🎤 錄音語音備註")
+        st.button("🔍 查詢名片紀錄")
     else:
         st.info("🧑‍💻 一般使用者功能")
         st.button("📷 拍照上傳名片")
