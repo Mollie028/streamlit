@@ -100,23 +100,23 @@ elif st.session_state["current_page"] == "ocr":
     ocr_page.run()
 
 elif st.session_state["current_page"] == "voice":
-    import pages.語音備註 as voice_page
+    import frontend.pages.語音備註 as voice_page
     voice_page.run()
 
 elif st.session_state["current_page"] == "account":
-    import pages.帳號管理 as acc_page
+    import frontend.pages.帳號管理 as acc_page
     acc_page.run()
 
 elif st.session_state["current_page"] == "user_manage":
-    import pages.使用者權限設定 as user_page
+    import frontend.pages.使用者權限設定 as user_page
     user_page.run()
 
 elif st.session_state["current_page"] == "delete_edit":
-    import pages.名片刪除 as del_page
+    import frontend.pages.名片刪除 as del_page
     del_page.run()
 
 elif st.session_state["current_page"] == "query":
-    import pages.查詢名片紀錄 as query_page
+    import frontend.pages.查詢名片紀錄 as query_page
     query_page.run()
 
 
