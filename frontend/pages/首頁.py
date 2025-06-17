@@ -21,6 +21,13 @@ def render():
             st.session_state.page = "資料匯出"; st.experimental_rerun()
         if st.button("名片刪除"):
             st.session_state.page = "名片刪除"; st.experimental_rerun()
+        if st.button("拍照上傳名片"):
+            st.session_state.page = "名片拍照"; st.experimental_rerun()
+        if st.button("錄音語音備註"):
+            st.session_state.page = "語音備註"; st.experimental_rerun()
+        if st.button("查詢名片紀錄"):
+            st.session_state.page = "查詢名片紀錄"; st.experimental_rerun()
+
 
         st.markdown("---")
 
