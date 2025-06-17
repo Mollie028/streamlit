@@ -54,6 +54,12 @@ elif st.session_state["current_page"] == "home":
     if st.button("🎤 錄音語音備註"):
         st.session_state["current_page"] = "voice"
         st.rerun()
-
+elif st.session_state["current_page"] == "ocr":
+    import pages.名片拍照 as ocr_page
+    ocr_page.run()
+elif st.session_state["current_page"] == "voice":
+    import pages.語音備註 as voice_page
+    voice_page.run()
+    
 
 
