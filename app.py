@@ -48,15 +48,15 @@ elif st.session_state["current_page"] == "home":
     st.success(f"🎉 歡迎 {st.session_state['username']}（{st.session_state['role']}）")
 
     st.info("🛠️ 功能選單")
-    if st.button("📷 拍照上傳名片"):
+    if st.button("上傳名片"):
         st.session_state["current_page"] = "ocr"
         st.rerun()
-    if st.button("🎤 錄音語音備註"):
+    if st.button("錄音語音備註"):
         st.session_state["current_page"] = "voice"
         st.rerun()
 elif st.session_state["current_page"] == "ocr":
     st.write("目前進入頁面：ocr")
-    import pages.名片拍照 as ocr_page
+    import pages.ocr as ocr_page
     ocr_page.run()
 elif st.session_state["current_page"] == "voice":
     import pages.語音備註 as voice_page
