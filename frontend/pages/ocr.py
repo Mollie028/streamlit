@@ -4,7 +4,6 @@ import requests
 print("🧪 [pages/ocr.py] 模組已載入")
 
 def run():
-    st.write("🚧 進入名片拍照頁面")
 
     st.header("📷 名片辨識（支援多張）")
     API_BASE = "https://ocr-whisper-api-production-03e9.up.railway.app"
