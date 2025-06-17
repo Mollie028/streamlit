@@ -1,7 +1,10 @@
 import streamlit as st
+import requests
 
-elif st.session_state["current_page"] == "ocr":
+def run():
     st.header("📷 名片辨識（支援多張）")
+    API_BASE = "https://ocr-whisper-api-production-03e9.up.railway.app"
+
     img_files = st.file_uploader("請上傳名片圖片（支援 jpg/png）", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
     if img_files:
