@@ -55,7 +55,7 @@ elif st.session_state["current_page"] == "home":
     if role == "admin":
         st.info("🛠️ 管理員功能選單")
 
-        if st.button("📷 上傳名片（OCR）"):
+        if st.button("📷 上傳名片"):
             st.session_state["current_page"] = "ocr"
             st.rerun()
             
@@ -82,7 +82,7 @@ elif st.session_state["current_page"] == "home":
     elif role == "user":
         st.info("📋 使用者功能選單")
 
-        if st.button("📷 上傳名片（OCR）"):
+        if st.button("📷 上傳名片"):
             st.session_state["current_page"] = "ocr"
             st.rerun()
 
