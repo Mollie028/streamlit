@@ -45,15 +45,56 @@ if st.session_state["current_page"] == "login":
 # 首頁：依角色顯示功能
 # ------------------------
 elif st.session_state["current_page"] == "home":
-    st.success(f"🎉 歡迎 {st.session_state['username']}（{st.session_state['role']}）")
+    role = st.session_state["role"]
+    username = st.session_state["username"]
+    st.success(f"🎉 歡迎 {username}（{role}）")
 
-    st.info("🛠️ 功能選單")
-    if st.button("上傳名片"):
-        st.session_state["current_page"] = "ocr"
-        st.rerun()
-    if st.button("錄音語音備註"):
-        st.session_state["current_page"] = "voice"
-        st.rerun()
+    # -------------------------
+    # 👑 管理員首頁功能畫面
+    # -------------------------
+    if role == "admin":
+        st.info("🛠️ 管理員功能選單")
+
+        if st.button("📷 上傳名片（OCR）"):
+            st.session_state["current_page"] = "ocr"
+            st.rerun()
+            
+
+        if st.button("🎤 錄音語音備註"):
+            st.session_state["current_page"] = "voice"
+            st.rerun()
+
+        if st.button("🗂️ 帳號管理"):
+            st.session_state["current_page"] = "account"
+            st.rerun()
+
+        if st.button("👥 使用者權限設定"):
+            st.session_state["current_page"] = "user_manage"
+            st.rerun()
+
+        if st.button("🗑️ 名片刪除與編輯"):
+            st.session_state["current_page"] = "delete_edit"
+            st.rerun()
+
+    # -------------------------
+    # 🙋 一般使用者首頁功能畫面
+    # -------------------------
+    elif role == "user":
+        st.info("📋 使用者功能選單")
+
+        if st.button("📷 上傳名片（OCR）"):
+            st.session_state["current_page"] = "ocr"
+            st.rerun()
+
+        if st.button("🎤 錄音語音備註"):
+            st.session_state["current_page"] = "voice"
+            st.rerun()
+
+        if st.button("🔍 查詢紀錄"):
+            st.session_state["current_page"] = "query"
+            st.rerun()
+
+
 elif st.session_state["current_page"] == "ocr":
     import frontend.pages.ocr as ocr_page
     ocr_page.run()
@@ -61,6 +102,22 @@ elif st.session_state["current_page"] == "ocr":
 elif st.session_state["current_page"] == "voice":
     import pages.語音備註 as voice_page
     voice_page.run()
-    
+
+elif st.session_state["current_page"] == "account":
+    import pages.帳號管理 as acc_page
+    acc_page.run()
+
+elif st.session_state["current_page"] == "user_manage":
+    import pages.使用者權限設定 as user_page
+    user_page.run()
+
+elif st.session_state["current_page"] == "delete_edit":
+    import pages.名片刪除 as del_page
+    del_page.run()
+
+elif st.session_state["current_page"] == "query":
+    import pages.查詢名片紀錄 as query_page
+    query_page.run()
+
 
 
