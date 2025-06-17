@@ -55,7 +55,7 @@ elif st.session_state["current_page"] == "home":
         st.session_state["current_page"] = "voice"
         st.rerun()
 elif st.session_state["current_page"] == "ocr":
-     st.write("目前進入頁面：ocr")
+    st.write("目前進入頁面：ocr")
     import pages.名片拍照 as ocr_page
     ocr_page.run()
 elif st.session_state["current_page"] == "voice":
