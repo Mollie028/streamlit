@@ -1,29 +1,43 @@
-# frontend/pages/首頁.py
 import streamlit as st
+import requests
 
-st.set_page_config(page_title="首頁", page_icon="🏠")
+API_URL = "https://ocr-whisper-api-production-03e9.up.railway.app"
 
-if "access_token" not in st.session_state:
-    st.warning("請先登入")
+st.set_page_config(page_title="名片辨識登入", page_icon="🔐")
+
+# ✅ 登入後，顯示首頁（依照角色）
+if st.session_state.get("access_token") and st.session_state.get("role"):
+    username = st.session_state.get("username")
+    role = st.session_state.get("role")
+    st.success(f"🎉 歡迎 {username}（{role}）")
+
+    if role == "admin":
+        st.write("🛠️ 管理員功能：資料匯出、帳號管理、名片刪除...")
+    else:
+        st.write("🧑‍💻 一般使用者功能：上傳名片、語音備註...")
+
+    st.button("🔓 登出", on_click=lambda: st.session_state.clear())
     st.stop()
 
-username = st.session_state.get("username", "未知使用者")
-role = st.session_state.get("role", "user")
+# ✅ 尚未登入
+st.title("🔐 登入系統")
 
-st.success(f"👋 歡迎 {username}（{role}）")
+username = st.text_input("帳號")
+password = st.text_input("密碼", type="password")
 
-# ✅ 管理員功能區塊
-if role == "admin":
-    st.info("🛠️ 管理員功能")
-    st.page_link("名片拍照.py", label="📷 拍照上傳名片")
-    st.page_link("語音備註.py", label="🎤 語音備註")
-    st.page_link("帳號管理.py", label="🔐 帳號管理")
-    st.page_link("資料匯出.py", label="📤 資料匯出")
-    st.page_link("名片刪除.py", label="🗑️ 名片刪除")
+if st.button("登入"):
+    try:
+        res = requests.post(f"{API_URL}/login", json={"username": username, "password": password})
+        if res.status_code == 200:
+            token = res.json().get("access_token")
+            st.session_state["access_token"] = token
 
-# ✅ 一般使用者功能區塊
-else:
-    st.info("🧑‍💻 一般使用者功能")
-    st.page_link("名片拍照.py", label="📷 拍照上傳名片")
-    st.page_link("語音備註.py", label="🎤 語音備註")
-    st.page_link("資料匯出.py", label="📤 資料匯出")
+            me_res = requests.get(f"{API_URL}/me", headers={"Authorization": f"Bearer {token}"})
+            me_data = me_res.json()
+            st.session_state["username"] = me_data.get("username")
+            st.session_state["role"] = me_data.get("role")
+            st.rerun()
+        else:
+            st.error("❌ 帳密錯誤，請重試")
+    except Exception as e:
+        st.error(f"❌ 登入失敗：{e}")
