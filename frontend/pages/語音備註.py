@@ -1,8 +1,9 @@
 import streamlit as st
-
-elif st.session_state["current_page"] == "voice":
+import requests
+def run():
     st.header("🎤 語音備註錄音")
     st.info("建議語音 3 秒以上")
+    API_BASE = "https://ocr-whisper-api-production-03e9.up.railway.app"
 
     if "recorded" not in st.session_state:
         st.session_state.recorded = False
