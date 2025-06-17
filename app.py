@@ -47,12 +47,27 @@ if st.session_state["current_page"] == "login":
 elif st.session_state["current_page"] == "home":
     st.success(f"🎉 歡迎 {st.session_state['username']}（{st.session_state['role']}）")
 
+     if st.session_state["role"] == "admin":
+        st.info("🛠️ 管理員功能")
+        if st.button("📤 資料匯出"):
+            st.session_state["current_page"] = "export"
+            st.rerun()
+        if st.button("🔐 帳號管理"):
+            st.session_state["current_page"] = "accounts"
+            st.rerun()
+        if st.button("🗑️ 名片刪除"):
+            st.session_state["current_page"] = "delete"
+            st.rerun()
+
     st.info("🛠️ 功能選單")
     if st.button("📷 拍照上傳名片"):
         st.session_state["current_page"] = "ocr"
         st.rerun()
     if st.button("🎤 錄音語音備註"):
         st.session_state["current_page"] = "voice"
+        st.rerun()
+     if st.button("🔍 查詢名片紀錄"):
+        st.session_state["current_page"] = "search"
         st.rerun()
 
 # ------------------------
