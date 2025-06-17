@@ -1,65 +1,48 @@
 import streamlit as st
-import requests
 
-API_URL = "https://ocr-whisper-api-production-03e9.up.railway.app"
+st.set_page_config(page_title="名片辨識登入", page_icon="🔐")
 
-st.set_page_config(page_title="名片辨識系統", page_icon="📇")
+# ✅ 模擬帳號資料（寫死帳號密碼與角色）
+DUMMY_USERNAME = "testuser"
+DUMMY_PASSWORD = "123456"
+DUMMY_ROLE = "admin"
+DUMMY_TOKEN = "fake-token"
 
-# 初始化 page 狀態
-if "access_token" not in st.session_state:
-    st.session_state["access_token"] = None
-if "page" not in st.session_state:
-    st.session_state["page"] = "login"
+# ✅ 已登入畫面（根據角色顯示功能）
+if st.session_state.get("access_token") and st.session_state.get("role"):
+    username = st.session_state.get("username")
+    role = st.session_state.get("role")
+    st.success(f"🎉 歡迎 {username}（{role}）")
 
-# ======================
-# ⛔ 尚未登入 → 顯示登入畫面
-# ======================
-if not st.session_state["access_token"] or st.session_state["page"] == "login":
-    st.title("🔐 請先登入")
-    username = st.text_input("帳號")
-    password = st.text_input("密碼", type="password")
-    if st.button("登入"):
-        try:
-            res = requests.post(f"{API_URL}/login", json={"username": username, "password": password})
-            if res.status_code == 200:
-                st.session_state["access_token"] = res.json().get("access_token")
-                st.session_state["page"] = "home"
-                st.rerun()
-            else:
-                st.error("❌ 登入失敗，請確認帳號密碼")
-        except Exception as e:
-            st.error(f"🚨 登入錯誤：{e}")
+    if role == "admin":
+        st.info("🛠️ 管理員功能")
+        st.button("📤 資料匯出")
+        st.button("🔐 帳號管理")
+        st.button("🗑️ 名片刪除")
+    else:
+        st.info("🧑‍💻 一般使用者功能")
+        st.button("📷 拍照上傳名片")
+        st.button("🎤 錄音語音備註")
+        st.button("🔍 查詢名片紀錄")
+
+    if st.button("🔓 登出"):
+        st.session_state.clear()
+        st.rerun()
+
     st.stop()
 
-# ======================
-# ✅ 已登入 → 顯示首頁功能
-# ======================
-with st.spinner("🔐 載入使用者資料..."):
-    try:
-        res = requests.get(f"{API_URL}/me", headers={"Authorization": f"Bearer {st.session_state['access_token']}"})
-        user = res.json()
-        username = user.get("username")
-        role = user.get("role")
-        st.success(f"👋 歡迎 {username}（{role}）")
+# ✅ 尚未登入
+st.title("🔐 登入系統")
 
-        # 管理員功能
-        if role == "admin":
-            st.page_link("frontend/pages/名片拍照.py", label="📷 拍照上傳名片", icon="📸")
-            st.page_link("frontend/pages/語音備註.py", label="🎤 語音備註", icon="🎙️")
-            st.page_link("frontend/pages/查詢名片紀錄.py", label="🔍 查詢紀錄", icon="🔍")
-            st.page_link("frontend/pages/帳號管理.py", label="👥 帳號管理", icon="🧑")
-            st.page_link("frontend/pages/資料匯出.py", label="📤 資料匯出", icon="📦")
-            st.page_link("frontend/pages/名片刪除.py", label="🗑️ 名片刪除", icon="🗑️")
-        else:
-            st.page_link("frontend/pages/名片拍照.py", label="📷 拍照上傳名片", icon="📸")
-            st.page_link("frontend/pages/語音備註.py", label="🎤 語音備註", icon="🎙️")
-            st.page_link("frontend/pages/查詢名片紀錄.py", label="🔍 查詢紀錄", icon="🔍")
-            st.page_link("frontend/pages/資料匯出.py", label="📤 資料匯出", icon="📦")
+username = st.text_input("帳號")
+password = st.text_input("密碼", type="password")
 
-        if st.button("登出"):
-            st.session_state.clear()
-            st.rerun()
-
-    except Exception as e:
-        st.error(f"❌ 無法取得使用者資訊：{e}")
-        st.stop()
+if st.button("登入"):
+    if username == DUMMY_USERNAME and password == DUMMY_PASSWORD:
+        st.session_state["access_token"] = DUMMY_TOKEN
+        st.session_state["username"] = DUMMY_USERNAME
+        st.session_state["role"] = DUMMY_ROLE
+        st.success("✅ 登入成功，重新導向中...")
+        st.rerun()
+    else:
+        st.error("❌ 帳號或密碼錯誤")
