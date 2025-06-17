@@ -47,27 +47,12 @@ if st.session_state["current_page"] == "login":
 elif st.session_state["current_page"] == "home":
     st.success(f"🎉 歡迎 {st.session_state['username']}（{st.session_state['role']}）")
 
-    if st.session_state["role"] == "admin":
-        st.info("🛠️ 管理員功能")
-        if st.button("📤 資料匯出"):
-            st.session_state["current_page"] = "export"
-            st.rerun()
-        if st.button("🔐 帳號管理"):
-            st.session_state["current_page"] = "accounts"
-            st.rerun()
-        if st.button("🗑️ 名片刪除"):
-            st.session_state["current_page"] = "delete"
-            st.rerun()
-
     st.info("🛠️ 功能選單")
     if st.button("📷 拍照上傳名片"):
         st.session_state["current_page"] = "ocr"
         st.rerun()
     if st.button("🎤 錄音語音備註"):
         st.session_state["current_page"] = "voice"
-        st.rerun()
-     if st.button("🔍 查詢名片紀錄"):
-        st.session_state["current_page"] = "search"
         st.rerun()
 
 # ------------------------
@@ -164,24 +149,4 @@ elif st.session_state["current_page"] == "voice":
             st.session_state.audio_data = None
             st.session_state.transcript = ""
 
-    st.button("⬅️ 返回首頁", on_click=lambda: st.session_state.update(current_page="home"))
-
-elif st.session_state["current_page"] == "search":
-    st.title("🔍 查詢紀錄")
-    st.write("這裡是名片查詢頁。")
-    st.button("⬅️ 返回首頁", on_click=lambda: st.session_state.update(current_page="home"))
-
-elif st.session_state["current_page"] == "accounts":
-    st.title("🔐 帳號管理")
-    st.write("這裡是管理員帳號功能頁。")
-    st.button("⬅️ 返回首頁", on_click=lambda: st.session_state.update(current_page="home"))
-
-elif st.session_state["current_page"] == "export":
-    st.title("📤 資料匯出")
-    st.write("這裡是資料匯出功能頁。")
-    st.button("⬅️ 返回首頁", on_click=lambda: st.session_state.update(current_page="home"))
-
-elif st.session_state["current_page"] == "delete":
-    st.title("🗑️ 名片刪除")
-    st.write("這裡是名片刪除功能頁。")
     st.button("⬅️ 返回首頁", on_click=lambda: st.session_state.update(current_page="home"))
