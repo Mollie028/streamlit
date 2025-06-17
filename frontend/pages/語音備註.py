@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+from audio_recorder_streamlit import audio_recorder
 def run():
     st.header("🎤 語音備註錄音")
     st.info("建議語音 3 秒以上")
