@@ -1,5 +1,7 @@
 import streamlit as st
 
-st.set_page_config(page_title="帳號管理", page_icon="🔐")
-st.title("🔐 帳號管理")
-st.write("這是管理員才能看到的帳號管理功能頁面")
+def render():
+    st.set_page_config(page_title="帳號管理", page_icon="🔐")
+    st.header("🔐 帳號管理（限管理員）")
+    st.write("這裡放「帳號管理」的介面，例如建立／刪除使用者、重設密碼")
+
