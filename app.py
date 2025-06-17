@@ -55,7 +55,6 @@ elif st.session_state["current_page"] == "home":
         st.session_state["current_page"] = "voice"
         st.rerun()
 elif st.session_state["current_page"] == "ocr":
-    st.write("🧭 現在進入 ocr 頁面")
     import frontend.pages.ocr as ocr_page
     ocr_page.run()
 
