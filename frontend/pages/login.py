@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 from streamlit_extras.switch_page_button import switch_page
 
-st.set_page_config(page_title="登入頁面", page_icon="🔐")  # ✅ 必須是第一行
+st.set_page_config(page_title="登入頁面", page_icon="🔐")  
 
 API_URL = "https://ocr-whisper-api-production-03e9.up.railway.app"
 
