@@ -18,19 +18,28 @@ def create_user(username, password, role="user"):
     try:
         conn = get_conn()
         cur = conn.cursor()
-        cur.execute("INSERT INTO users (username, password, role) VALUES (%s, %s, %s)", (username, password, role))
+
+        print(f"🧪 嘗試註冊：{username}, {role}")
+        cur.execute(
+            "INSERT INTO users (username, password, role) VALUES (%s, %s, %s)",
+            (username, password, role)
+        )
         conn.commit()
+        print("✅ 註冊成功")
         return True
+
     except Exception as e:
         print("❌ 註冊失敗：", e)
         if conn:
             conn.rollback()
         return False
+
     finally:
         if cur:
             cur.close()
         if conn:
             conn.close()
+
 
 def check_login(username, password):
     try:
