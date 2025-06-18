@@ -4,5 +4,4 @@ pillow
 audio-recorder-streamlit
 streamlit-extras
 psycopg2-binary
-python-dotenv
 
