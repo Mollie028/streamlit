@@ -1,29 +1,33 @@
-import psycopg2
-from core.config import DB_URL
-
-def get_conn():
-    return psycopg2.connect(DB_URL)
-
 def create_user(username, password, role="user"):
+    conn = None
+    cur = None
     try:
         conn = get_conn()
         cur = conn.cursor()
         cur.execute("INSERT INTO users (username, password, role) VALUES (%s, %s, %s)", (username, password, role))
         conn.commit()
         return True
-    except:
+    except Exception as e:
+        print("❌ create_user 發生錯誤：", e)
+        if conn:
+            conn.rollback()
         return False
     finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+def test_db_connection():
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT 1;")
+        result = cur.fetchone()
+        print("✅ 成功連接資料庫！查詢結果：", result)
         cur.close()
         conn.close()
-
-def check_login(username, password):
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT password, role FROM users WHERE username = %s", (username,))
-    row = cur.fetchone()
-    cur.close()
-    conn.close()
-    if row and row[0] == password:
-        return row[1]
-    return None
+        return True
+    except Exception as e:
+        print("❌ 無法連接資料庫：", e)
+        return False
