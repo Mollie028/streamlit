@@ -3,5 +3,5 @@ requests
 pillow
 audio-recorder-streamlit
 streamlit-extras
-psycopg2
+psycopg2-binary
 
