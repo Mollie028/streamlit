@@ -7,6 +7,7 @@ from audio_recorder_streamlit import audio_recorder
 # ------------------------
 st.set_page_config(page_title="名片辨識系統", layout="centered")
 API_BASE = "https://ocr-whisper-api-production-03e9.up.railway.app"
+ocr_url = f"{API_BASE}/ocr"
 DUMMY_USERNAME = "testuser"
 DUMMY_PASSWORD = "123456"
 DUMMY_ROLE = "admin"
