@@ -2,6 +2,8 @@ import streamlit as st
 import requests
 from audio_recorder_streamlit import audio_recorder
 from services.auth_service import check_login, create_user
+from services.auth_service import test_db_connection
+test_db_connection()
 
 
 # ------------------------
