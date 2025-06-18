@@ -35,6 +35,7 @@ if st.session_state["current_page"] == "login":
     username = st.text_input("帳號")
     password = st.text_input("密碼", type="password")
 
+    # 👉 登入按鈕
     if st.button("登入"):
         role = check_login(username, password)
         if role:
@@ -46,9 +47,11 @@ if st.session_state["current_page"] == "login":
         else:
             st.error("❌ 帳號或密碼錯誤")
 
-    if st.button("還沒有帳號？註冊"):
+  
+    if st.button("註冊"):
         st.session_state["current_page"] = "register"
         st.rerun()
+
 
 
 # ------------------------
