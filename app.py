@@ -2,6 +2,10 @@ import streamlit as st
 import requests
 from audio_recorder_streamlit import audio_recorder
 from services.auth_service import check_login, create_user
+from services.auth_service import test_db_connection
+
+if not test_db_connection():
+    st.error("❌ 目前無法連接資料庫，請檢查 DATABASE_URL")
 
 
 # ------------------------
