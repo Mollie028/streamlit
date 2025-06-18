@@ -1,6 +1,8 @@
 import streamlit as st
 import requests
 from audio_recorder_streamlit import audio_recorder
+from services.auth_service import check_login, create_user
+
 
 # ------------------------
 # 設定與假資料
@@ -32,19 +34,43 @@ if st.session_state["current_page"] == "login":
     st.title("🔐 登入系統")
     username = st.text_input("帳號")
     password = st.text_input("密碼", type="password")
+
     if st.button("登入"):
-        if username == DUMMY_USERNAME and password == DUMMY_PASSWORD:
-            st.session_state["access_token"] = DUMMY_TOKEN
-            st.session_state["username"] = DUMMY_USERNAME
-            st.session_state["role"] = DUMMY_ROLE
+        role = check_login(username, password)
+        if role:
+            st.session_state["access_token"] = "ok"
+            st.session_state["username"] = username
+            st.session_state["role"] = role
             st.session_state["current_page"] = "home"
             st.rerun()
         else:
             st.error("❌ 帳號或密碼錯誤")
 
+    if st.button("還沒有帳號？註冊"):
+        st.session_state["current_page"] = "register"
+        st.rerun()
+
+
 # ------------------------
 # 首頁：依角色顯示功能
 # ------------------------
+elif st.session_state["current_page"] == "register":
+    st.title("📝 註冊新帳號")
+    new_user = st.text_input("新帳號")
+    new_pass = st.text_input("新密碼", type="password")
+    role = st.selectbox("角色", ["user", "admin"])
+
+    if st.button("註冊"):
+        if create_user(new_user, new_pass, role):
+            st.success("✅ 註冊成功，請回到登入頁")
+        else:
+            st.error("❌ 此帳號已存在，請換一個")
+
+    if st.button("返回登入"):
+        st.session_state["current_page"] = "login"
+        st.rerun()
+
+
 elif st.session_state["current_page"] == "home":
     role = st.session_state["role"]
     username = st.session_state["username"]
