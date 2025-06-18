@@ -1,6 +1,19 @@
 from core.config import DB_URL
 import psycopg2
 
+
+from core.config import DB_URL
+import psycopg2
+
+def test_db_connection():
+    try:
+        conn = psycopg2.connect(DB_URL)
+        print("✅ 成功連線 DB")
+        conn.close()
+    except Exception as e:
+        print("❌ 無法連線資料庫：", e)
+
+
 def get_conn():
     return psycopg2.connect(DB_URL)
 
