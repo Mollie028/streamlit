@@ -35,22 +35,25 @@ if st.session_state["current_page"] == "login":
     username = st.text_input("帳號")
     password = st.text_input("密碼", type="password")
 
-    # 👉 登入按鈕
-    if st.button("登入"):
-        role = check_login(username, password)
-        if role:
-            st.session_state["access_token"] = "ok"
-            st.session_state["username"] = username
-            st.session_state["role"] = role
-            st.session_state["current_page"] = "home"
-            st.rerun()
-        else:
-            st.error("❌ 帳號或密碼錯誤")
+    col1, col2 = st.columns(2)
 
-  
-    if st.button("註冊"):
-        st.session_state["current_page"] = "register"
-        st.rerun()
+    with col1:
+        if st.button("登入"):
+            role = check_login(username, password)
+            if role:
+                st.session_state["access_token"] = "ok"
+                st.session_state["username"] = username
+                st.session_state["role"] = role
+                st.session_state["current_page"] = "home"
+                st.rerun()
+            else:
+                st.error("❌ 帳號或密碼錯誤")
+
+    with col2:
+        if st.button("註冊"):
+            st.session_state["current_page"] = "register"
+            st.rerun()
+
 
 
 
