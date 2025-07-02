@@ -10,7 +10,7 @@ from services.auth_service import check_login, create_user
 # 設定與假資料
 # ------------------------
 st.set_page_config(page_title="名片辨識系統", layout="centered")
-API_BASE = "https://ocr-whisper-api-production-03e9.up.railway.app"
+API_BASE = "https://ocr-whisper-production-2.up.railway.app/"
 ocr_url = f"{API_BASE}/ocr"
 DUMMY_USERNAME = "testuser"
 DUMMY_PASSWORD = "123456"
