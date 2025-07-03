@@ -3,22 +3,21 @@ from core.config import API_BASE
 
 def create_user(username, password, role="user", company_name=None):
     try:
-        res = requests.post(
-            f"{API_BASE}/register",
-            json={
-                "username": username,
-                "password": password,
-                "role": role,
-                "company_name": company_name
-            }
-        )
-        if res.status_code == 200:
-            return True
-        else:
-            # 回傳錯誤訊息內容
-            return res.text
+        body = {
+            "username": username,
+            "password": password,
+            "role": role,
+            "company_name": company_name
+        }
+        print("📤 發送註冊請求：", body)
+        res = requests.post(f"{API_BASE}/register", json=body)
+        print("📥 後端回應狀態碼：", res.status_code)
+        print("📥 後端回應內容：", res.text)
+
+        return res.status_code == 200
     except Exception as e:
-        return f"❌ API 呼叫失敗：{e}"
+        print("❌ 註冊 API 呼叫失敗：", e)
+        return False
 
 def check_login(username, password):
     try:
