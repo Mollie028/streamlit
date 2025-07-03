@@ -1,56 +1,40 @@
-import psycopg2
-from core.config import DB_URL
+# services/auth_service.py
 
-# ✅ 自動測試 DB 是否能成功連線
-try:
-    print("🧪 測試 DB_URL =", DB_URL)
-    test_conn = psycopg2.connect(DB_URL)
-    print("✅ 成功連線 PostgreSQL")
-    test_conn.close()
-except Exception as e:
-    print("❌ 無法連線 DB：", e)
+import requests
 
-def get_conn():
-    return psycopg2.connect(DB_URL)
-
-def create_user(username, password, role="user"):
-    conn = cur = None
-    try:
-        conn = get_conn()
-        cur = conn.cursor()
-
-        print(f"🧪 嘗試註冊：{username}, {role}")
-        cur.execute(
-            "INSERT INTO users (username, password, role) VALUES (%s, %s, %s)",
-            (username, password, role)
-        )
-        conn.commit()
-        print("✅ 註冊成功")
-        return True
-
-    except Exception as e:
-        print("❌ 註冊失敗：", e)
-        if conn:
-            conn.rollback()
-        return False
-
-    finally:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
-
+API_BASE = "https://ocr-whisper-production-2.up.railway.app"
 
 def check_login(username, password):
+    url = f"{API_BASE}/login"
+    data = {"username": username, "password": password}
     try:
-        conn = get_conn()
-        cur = conn.cursor()
-        cur.execute("SELECT password, role FROM users WHERE username = %s", (username,))
-        row = cur.fetchone()
-        cur.close()
-        conn.close()
-        if row and row[0] == password:
-            return row[1]
+        res = requests.post(url, json=data)
+        if res.status_code == 200:
+            res_data = res.json()
+            return "admin" if res_data.get("is_admin") else "user"
+        else:
+            print("❌ 登入失敗：", res.status_code, res.text)
+            return None
     except Exception as e:
-        print("❌ 登入失敗：", e)
-    return None
+        print("❌ 登入例外：", e)
+        return None
+
+
+def create_user(username, password, role):
+    url = f"{API_BASE}/register"
+    data = {
+        "username": username,
+        "password": password,
+        "is_admin": role == "admin"
+    }
+    try:
+        res = requests.post(url, json=data)
+        if res.status_code == 200:
+            print("✅ 註冊成功")
+            return True
+        else:
+            print("❌ 註冊失敗：", res.status_code, res.text)
+            return False
+    except Exception as e:
+        print("❌ 註冊例外：", e)
+        return False
