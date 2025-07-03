@@ -1,10 +1,11 @@
-import requests
-from core.config import API_BASE
-from core.config import DB_URL
-import psycopg2
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import requests
+import psycopg2
+from core.config import API_BASE, DB_URL
+
 
 def create_user(username, password, role="user", company_name=None):
     try:
