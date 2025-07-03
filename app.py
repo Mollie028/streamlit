@@ -68,11 +68,16 @@ elif st.session_state["current_page"] == "register":
     new_pass = st.text_input("新密碼", type="password")
     role = st.selectbox("角色", ["user", "admin"])
 
-    if st.button("註冊"):
-        if create_user(new_user, new_pass, role):
-            st.success("✅ 註冊成功，請回到登入頁")
-        else:
-            st.error("❌ 此帳號已存在，請換一個")
+if st.button("註冊"):
+    st.toast("📡 正在送出註冊資料...")
+    result = create_user(new_user, new_pass, role)
+
+    if result is True:
+        st.success("✅ 註冊成功，請回到登入頁")
+    else:
+        st.error(f"❌ 註冊失敗，原因：{result}")
+        st.code(f"🛠️ Debug 資訊：帳號={new_user}, 角色={role}")
+
 
     if st.button("返回登入"):
         st.session_state["current_page"] = "login"
