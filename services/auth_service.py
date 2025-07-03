@@ -1,5 +1,7 @@
 import requests
 from core.config import API_BASE
+from core.config import DB_URL
+import psycopg2
 
 def create_user(username, password, role="user", company_name=None):
     try:
@@ -33,3 +35,13 @@ def check_login(username, password):
     except Exception as e:
         print("❌ 登入 API 錯誤：", e)
         return None
+
+def test_db_connection():
+    try:
+        conn = psycopg2.connect(DB_URL)
+        conn.close()
+        print("✅ 成功連線資料庫")
+        return True
+    except Exception as e:
+        print("❌ 無法連線資料庫：", e)
+        return False
