@@ -4,7 +4,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import requests
 import psycopg2
-from core.config import API_BASE, DB_URL
+from core.config import API_BASE
 
 
 def create_user(username, password, role="user", company_name=None):
