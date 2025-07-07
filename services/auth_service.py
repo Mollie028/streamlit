@@ -12,7 +12,6 @@ def create_user(username, password, role="user", company_name=None):
         body = {
             "username": username,
             "password": password,
-            "role": role,
             "company_name": company_name
         }
         print("📤 發送註冊請求：", body)
