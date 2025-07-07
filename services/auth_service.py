@@ -20,10 +20,18 @@ def create_user(username, password, role="user", company_name=None):
         print("📥 後端回應狀態碼：", res.status_code)
         print("📥 後端回應內容：", res.text)
 
-        return res.status_code == 200
+        if res.status_code == 200:
+            return True
+        else:
+            # 嘗試回傳後端錯誤內容
+            try:
+                return res.json().get("detail", f"錯誤狀態碼：{res.status_code}")
+            except Exception:
+                return f"註冊失敗，錯誤碼 {res.status_code}，內容：{res.text}"
     except Exception as e:
         print("❌ 註冊 API 呼叫失敗：", e)
-        return False
+        return f"⚠️ 呼叫失敗：{e}"
+
 
 def check_login(username, password):
     try:
