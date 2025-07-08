@@ -7,21 +7,22 @@ import psycopg2
 from core.config import API_BASE
 
 
-def create_user(username, password, company_name=None):
+def create_user(username, password, company_name=None, is_admin=False):
+    payload = {
+        "username": username,
+        "password": password,
+        "company_name": company_name,
+        "is_admin": is_admin
+    }
     try:
-        body = {
-            "username": username,
-            "password": password,
-            "company_name": company_name or ""
-        }
-
-        res = requests.post(f"{API_BASE}/register", json=body)
+        res = requests.post(f"{API_BASE}/register", json=payload)
         if res.status_code == 200:
             return True
         else:
-            return res.json().get("detail", f"錯誤狀態碼：{res.status_code}")
+            return f"錯誤狀態碼：{res.status_code}"
     except Exception as e:
-        return f"⚠️ 呼叫失敗：{e}"
+        return f"例外錯誤：{str(e)}"
+
 
 
 
