@@ -56,24 +56,37 @@ elif st.session_state["current_page"] == "register":
     st.title("📝 註冊新帳號")
     new_user = st.text_input("新帳號")
     new_pass = st.text_input("新密碼", type="password")
-    company = st.text_input("公司名稱（可留空）")
-
-    role_option = st.selectbox("使用者身分", ["一般使用者", "管理員"])
-    is_admin = True if role_option == "管理員" else False
+    company_name = st.text_input("公司名稱（可留空）")
+    
+    # 👉 這一行是新增的選單（重要）
+    is_admin = st.radio("選擇身分", ["使用者", "管理員"], horizontal=True) == "管理員"
 
     if st.button("註冊"):
         st.toast("📡 正在送出註冊資料...")
-        result = create_user(new_user, new_pass, company, is_admin)
 
-        if result is True:
-            st.success("✅ 註冊成功，請回到登入頁")
-        else:
-            st.error(f"❌ 註冊失敗，原因：{result}")
-            st.code(f"🛠️ Debug 資訊：帳號={new_user}, 公司={company}, is_admin={is_admin}")
+        # 👇 傳送資料要包含 is_admin
+        payload = {
+            "username": new_user,
+            "password": new_pass,
+            "company_name": company_name,
+            "is_admin": is_admin
+        }
+
+        try:
+            res = requests.post(f"{API_BASE}/register", json=payload)
+            if res.status_code == 200:
+                st.success("✅ 註冊成功，請回到登入頁")
+            else:
+                st.error(f"❌ 註冊失敗，原因：{res.json().get('message')}")
+                st.code(f"🛠️ Debug 資訊：{res.text}")
+        except Exception as e:
+            st.error("❌ 註冊失敗，系統錯誤")
+            st.code(str(e))
 
     if st.button("返回登入"):
         st.session_state["current_page"] = "login"
         st.rerun()
+
 
 # ------------------------
 # 首頁：依角色顯示功能
