@@ -60,11 +60,15 @@ elif st.session_state["current_page"] == "register":
     st.title("📝 註冊新帳號")
     new_user = st.text_input("新帳號")
     new_pass = st.text_input("新密碼", type="password")
-    company_name = st.text_input("公司名稱（可留空）")
+    company = st.text_input("公司名稱（可留空）")
+    
+    role_option = st.selectbox("使用者身分", ["一般使用者", "管理員"])
+    is_admin = True if role_option == "管理員" else False
+
 
     if st.button("註冊"):
         st.toast("📡 正在送出註冊資料...")
-        result = create_user(new_user, new_pass, company_name)
+        result = create_user(new_user, new_pass, company, is_admin)
 
         if result is True:
             st.success("✅ 註冊成功，請回到登入頁")
