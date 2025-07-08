@@ -43,3 +43,5 @@ def run():
             except Exception as e:
                 st.error("❌ 更新錯誤")
                 st.code(str(e))
+
+st.button("⬅️ 返回首頁", on_click=lambda: st.session_state.update(current_page="home"))
