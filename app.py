@@ -4,9 +4,6 @@ from audio_recorder_streamlit import audio_recorder
 from services.auth_service import check_login, create_user
 from core.config import API_BASE  
 
-# ------------------------
-# 設定與假資料
-# ------------------------
 st.set_page_config(page_title="名片辨識系統", layout="centered")
 ocr_url = f"{API_BASE}/ocr"
 
@@ -50,21 +47,19 @@ if st.session_state["current_page"] == "login":
             st.rerun()
 
 # ------------------------
-# 註冊頁面
+# 註冊頁面（已新增 is_admin 選項）
 # ------------------------
 elif st.session_state["current_page"] == "register":
     st.title("📝 註冊新帳號")
     new_user = st.text_input("新帳號")
     new_pass = st.text_input("新密碼", type="password")
     company_name = st.text_input("公司名稱（可留空）")
-    
-    # 👉 這一行是新增的選單（重要）
+
+    # ✅ 新增身份選擇欄位
     is_admin = st.radio("選擇身分", ["使用者", "管理員"], horizontal=True) == "管理員"
 
     if st.button("註冊"):
         st.toast("📡 正在送出註冊資料...")
-
-        # 👇 傳送資料要包含 is_admin
         payload = {
             "username": new_user,
             "password": new_pass,
@@ -87,9 +82,8 @@ elif st.session_state["current_page"] == "register":
         st.session_state["current_page"] = "login"
         st.rerun()
 
-
 # ------------------------
-# 首頁：依角色顯示功能
+# 首頁畫面（依身分顯示功能）
 # ------------------------
 elif st.session_state["current_page"] == "home":
     role = st.session_state["role"]
@@ -98,44 +92,35 @@ elif st.session_state["current_page"] == "home":
 
     if role == "admin":
         st.info("🛠️ 管理員功能選單")
-
         if st.button("📷 上傳名片"):
             st.session_state["current_page"] = "ocr"
             st.rerun()
-
         if st.button("🎤 錄音語音備註"):
             st.session_state["current_page"] = "voice"
             st.rerun()
-
         if st.button("🗂️ 帳號管理"):
             st.session_state["current_page"] = "account"
             st.rerun()
-
         if st.button("👥 使用者權限設定"):
             st.session_state["current_page"] = "user_manage"
             st.rerun()
-
         if st.button("🗑️ 名片刪除與編輯"):
             st.session_state["current_page"] = "delete_edit"
             st.rerun()
-
-    elif role == "user":
+    else:
         st.info("📋 使用者功能選單")
-
         if st.button("📷 上傳名片"):
             st.session_state["current_page"] = "ocr"
             st.rerun()
-
         if st.button("🎤 錄音語音備註"):
             st.session_state["current_page"] = "voice"
             st.rerun()
-
         if st.button("🔍 查詢紀錄"):
             st.session_state["current_page"] = "query"
             st.rerun()
 
 # ------------------------
-# 頁面分流
+# 各功能頁面分流
 # ------------------------
 elif st.session_state["current_page"] == "ocr":
     import frontend.pages.ocr as ocr_page
