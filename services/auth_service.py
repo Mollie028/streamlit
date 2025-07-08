@@ -7,14 +7,12 @@ import psycopg2
 from core.config import API_BASE
 
 
-def create_user(username, password, is_admin=False, can_view_all=False, company_name=None):
+def create_user(username, password, company_name=None):
     try:
         body = {
             "username": username,
             "password": password,
-            "company_name": company_name or "",
-            "is_admin": is_admin,
-            "can_view_all": can_view_all
+            "company_name": company_name or ""
         }
 
         print("📤 發送註冊請求：", body)
@@ -25,7 +23,6 @@ def create_user(username, password, is_admin=False, can_view_all=False, company_
         if res.status_code == 200:
             return True
         else:
-            # 嘗試回傳後端錯誤內容
             try:
                 return res.json().get("detail", f"錯誤狀態碼：{res.status_code}")
             except Exception:
@@ -33,6 +30,7 @@ def create_user(username, password, is_admin=False, can_view_all=False, company_
     except Exception as e:
         print("❌ 註冊 API 呼叫失敗：", e)
         return f"⚠️ 呼叫失敗：{e}"
+
 
 
 def check_login(username, password):
