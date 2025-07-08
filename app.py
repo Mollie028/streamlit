@@ -51,19 +51,23 @@ if st.session_state["current_page"] == "login":
 # ------------------------
 elif st.session_state["current_page"] == "register":
     st.title("📝 註冊新帳號")
+    
+    # 📌 這些是表單欄位（都要寫在 button 外）
     new_user = st.text_input("新帳號")
     new_pass = st.text_input("新密碼", type="password")
-    company_name = st.text_input("公司名稱（可留空）") 
-    identity = st.radio("選擇身分", ["使用者", "管理員"], horizontal=True)
-    is_admin = True if identity == "管理員" else False
-    
+    company_name = st.text_input("公司名稱（可留空）")
+    identity = st.radio("請選擇身分", ["使用者", "管理員"], horizontal=True)
+    is_admin = identity == "管理員"  # ✅ 判斷布林值
+
+    # 📌 寫在 button 裡的：送出 payload
     if st.button("註冊"):
         st.toast("📡 正在送出註冊資料...")
+
         payload = {
             "username": new_user,
             "password": new_pass,
             "company_name": company_name,
-            "is_admin": is_admin
+            "is_admin": is_admin  # ✅ 傳出去的布林值
         }
 
         try:
@@ -80,6 +84,7 @@ elif st.session_state["current_page"] == "register":
     if st.button("返回登入"):
         st.session_state["current_page"] = "login"
         st.rerun()
+
 
 # ------------------------
 # 首頁畫面（依身分顯示功能）
