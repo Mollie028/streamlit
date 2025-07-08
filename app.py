@@ -55,7 +55,7 @@ elif st.session_state["current_page"] == "register":
     # 📌 這些是表單欄位（都要寫在 button 外）
     new_user = st.text_input("新帳號")
     new_pass = st.text_input("新密碼", type="password")
-
+    company_name = st.text_input("公司名稱（可留空）")
     identity = st.radio("請選擇身分", ["使用者", "管理員"], horizontal=True)
     is_admin = identity == "管理員"  # ✅ 判斷布林值
 
