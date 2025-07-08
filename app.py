@@ -53,9 +53,7 @@ elif st.session_state["current_page"] == "register":
     st.title("📝 註冊新帳號")
     new_user = st.text_input("新帳號")
     new_pass = st.text_input("新密碼", type="password")
-    company_name = st.text_input("公司名稱（可留空）")
-
-    # ✅ 新增身份選擇欄位    
+    company_name = st.text_input("公司名稱（可留空）") 
     identity = st.radio("選擇身分", ["使用者", "管理員"], horizontal=True)
     is_admin = True if identity == "管理員" else False
     
