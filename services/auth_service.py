@@ -15,20 +15,12 @@ def create_user(username, password, company_name=None):
             "company_name": company_name or ""
         }
 
-        print("📤 發送註冊請求：", body)
         res = requests.post(f"{API_BASE}/register", json=body)
-        print("📥 後端回應狀態碼：", res.status_code)
-        print("📥 後端回應內容：", res.text)
-
         if res.status_code == 200:
             return True
         else:
-            try:
-                return res.json().get("detail", f"錯誤狀態碼：{res.status_code}")
-            except Exception:
-                return f"註冊失敗，錯誤碼 {res.status_code}，內容：{res.text}"
+            return res.json().get("detail", f"錯誤狀態碼：{res.status_code}")
     except Exception as e:
-        print("❌ 註冊 API 呼叫失敗：", e)
         return f"⚠️ 呼叫失敗：{e}"
 
 
