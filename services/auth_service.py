@@ -12,8 +12,10 @@ def create_user(username, password, role="user", company_name=None):
         body = {
             "username": username,
             "password": password,
-            "company_name": company_name
+            "company_name": company_name or "",  
+            "role": role
         }
+
         print("📤 發送註冊請求：", body)
         res = requests.post(f"{API_BASE}/register", json=body)
         print("📥 後端回應狀態碼：", res.status_code)
