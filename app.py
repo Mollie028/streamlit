@@ -55,9 +55,10 @@ elif st.session_state["current_page"] == "register":
     new_pass = st.text_input("新密碼", type="password")
     company_name = st.text_input("公司名稱（可留空）")
 
-    # ✅ 新增身份選擇欄位
-    is_admin = st.radio("選擇身分", ["使用者", "管理員"], horizontal=True) == "管理員"
-
+    # ✅ 新增身份選擇欄位    
+    identity = st.radio("選擇身分", ["使用者", "管理員"], horizontal=True)
+    is_admin = True if identity == "管理員" else False
+    
     if st.button("註冊"):
         st.toast("📡 正在送出註冊資料...")
         payload = {
