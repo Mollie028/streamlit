@@ -33,13 +33,18 @@ def check_login(username, password):
             json={"username": username, "password": password}
         )
         if res.status_code == 200:
-            return res.json().get("role", "user")
+            data = res.json()
+            return {
+                "role": data.get("role", "user"),
+                "company_name": data.get("company_name", "")
+            }
         else:
             print("❌ 登入失敗：", res.text)
             return None
     except Exception as e:
         print("❌ 登入 API 錯誤：", e)
         return None
+
 
 def test_db_connection():
     try:
