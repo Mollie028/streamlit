@@ -102,9 +102,6 @@ elif st.session_state["current_page"] == "home":
         if st.button("🎤 錄音語音備註"):
             st.session_state["current_page"] = "voice"
             st.rerun()
-        if st.button("修改密碼"):
-            st.session_state["current_page"] = "account"
-            st.rerun()
         if st.button("👥 使用者權限設定"):
             st.session_state["current_page"] = "user_manage"
             st.rerun()
