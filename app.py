@@ -102,7 +102,7 @@ elif st.session_state["current_page"] == "home":
         if st.button("🎤 錄音語音備註"):
             st.session_state["current_page"] = "voice"
             st.rerun()
-        if st.button("🗂️ 帳號管理"):
+        if st.button("修改密碼"):
             st.session_state["current_page"] = "account"
             st.rerun()
         if st.button("👥 使用者權限設定"):
@@ -122,6 +122,9 @@ elif st.session_state["current_page"] == "home":
         if st.button("🔍 查詢紀錄"):
             st.session_state["current_page"] = "query"
             st.rerun()
+        if st.button("修改密碼"):
+            st.session_state["current_page"] = "account"
+            st.rerun()
 
 # ------------------------
 # 各功能頁面分流
@@ -135,7 +138,7 @@ elif st.session_state["current_page"] == "voice":
     voice_page.run()
 
 elif st.session_state["current_page"] == "account":
-    import frontend.pages.帳號管理 as acc_page
+    import frontend.pages.修改密碼 as acc_page
     acc_page.run()
 
 elif st.session_state["current_page"] == "user_manage":
