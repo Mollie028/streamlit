@@ -3,7 +3,7 @@ import requests
 from core.config import API_BASE
 
 def run():
-    st.title("🗂️ 帳號管理（管理員專用）")
+    st.title("修改密碼")
 
     # 取得所有帳號
     try:
