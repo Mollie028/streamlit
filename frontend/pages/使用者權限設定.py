@@ -78,11 +78,23 @@ def run():
     # 顯示公司內所有使用者清單（表格）
     # ------------------------------------
     st.subheader("📋 使用者帳號列表（僅顯示同公司）")
-    df = pd.DataFrame(users)
-    st.dataframe(df)
 
-    st.markdown("---")
+    filtered_users = [u for u in users if u.get("company_name") == company]
 
+    if filtered_users:
+        df = pd.DataFrame(filtered_users)
+        df = df.rename(columns={
+            "id": "ID",
+            "username": "使用者名稱",
+            "is_admin": "是否為管理員"
+        })
+        df["是否為管理員"] = df["是否為管理員"].apply(lambda x: "✅" if x else "❌")
+
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("🔍 尚無其他同公司帳號")
+
+    # 🔙 返回首頁按鈕
     if st.button("⬅️ 返回首頁"):
         st.session_state["current_page"] = "home"
         st.rerun()
