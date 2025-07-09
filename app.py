@@ -1,17 +1,15 @@
 import streamlit as st
 import requests
 from audio_recorder_streamlit import audio_recorder
-from services.auth_service import check_login
 from core.config import API_BASE  
 
 st.set_page_config(page_title="名片辨識系統", layout="centered")
-ocr_url = f"{API_BASE}/ocr"
 
 if "current_page" not in st.session_state:
     st.session_state["current_page"] = "login"
 
 # ------------------------
-# 登出按鈕（非登入頁才顯示）
+# 登出
 # ------------------------
 if st.session_state.get("access_token") and st.session_state["current_page"] != "login":
     if st.button("🔓 登出"):
@@ -28,7 +26,6 @@ if st.session_state["current_page"] == "login":
     password = st.text_input("密碼", type="password")
 
     col1, col2 = st.columns(2)
-
     with col1:
         if st.button("登入"):
             res = requests.post(f"{API_BASE}/login", json={"username": username, "password": password})
@@ -49,7 +46,7 @@ if st.session_state["current_page"] == "login":
             st.rerun()
 
 # ------------------------
-# 註冊頁面（已新增 is_admin 選項）
+# 註冊頁面
 # ------------------------
 elif st.session_state["current_page"] == "register":
     st.title("📝 註冊新帳號")
@@ -67,16 +64,14 @@ elif st.session_state["current_page"] == "register":
             "company_name": company_name,
             "is_admin": is_admin
         }
-
         try:
             res = requests.post(f"{API_BASE}/register", json=payload)
             if res.status_code == 200:
                 st.success("✅ 註冊成功，請回到登入頁")
             else:
-                st.error(f"❌ 註冊失敗，原因：{res.json().get('message')}")
-                st.code(f"🛠️ Debug 資訊：{res.text}")
+                st.error(f"❌ 註冊失敗：{res.json().get('message')}")
         except Exception as e:
-            st.error("❌ 註冊失敗，系統錯誤")
+            st.error("❌ 系統錯誤")
             st.code(str(e))
 
     if st.button("返回登入"):
@@ -84,7 +79,7 @@ elif st.session_state["current_page"] == "register":
         st.rerun()
 
 # ------------------------
-# 首頁畫面（依身分顯示功能）
+# 首頁（依身分顯示功能）
 # ------------------------
 elif st.session_state["current_page"] == "home":
     role = st.session_state["role"]
@@ -113,7 +108,7 @@ elif st.session_state["current_page"] == "home":
         if st.button("🎤 錄音語音備註"):
             st.session_state["current_page"] = "voice"
             st.rerun()
-        if st.button(" 修改密碼"):
+        if st.button("🔐 修改密碼"):
             st.session_state["current_page"] = "account"
             st.rerun()
         if st.button("🔍 查詢紀錄"):
@@ -121,28 +116,23 @@ elif st.session_state["current_page"] == "home":
             st.rerun()
 
 # ------------------------
-# 各功能頁面分流
+# 各功能分流
 # ------------------------
 elif st.session_state["current_page"] == "ocr":
     import frontend.pages.ocr as ocr_page
     ocr_page.run()
-
 elif st.session_state["current_page"] == "voice":
     import frontend.pages.語音備註 as voice_page
     voice_page.run()
-
 elif st.session_state["current_page"] == "account":
     import frontend.pages.帳號管理 as acc_page
     acc_page.run()
-
 elif st.session_state["current_page"] == "user_manage":
     import frontend.pages.使用者權限設定 as user_page
     user_page.run()
-
 elif st.session_state["current_page"] == "delete_edit":
     import frontend.pages.名片刪除 as del_page
     del_page.run()
-
 elif st.session_state["current_page"] == "query":
     import frontend.pages.查詢名片紀錄 as query_page
     query_page.run()
