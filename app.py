@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 from audio_recorder_streamlit import audio_recorder
-from services.auth_service import check_login, create_user
+from services.auth_service import check_login
 from core.config import API_BASE  
 
 st.set_page_config(page_title="名片辨識系統", layout="centered")
@@ -31,11 +31,13 @@ if st.session_state["current_page"] == "login":
 
     with col1:
         if st.button("登入"):
-            role = check_login(username, password)
-            if role:
-                st.session_state["access_token"] = "ok"
+            res = requests.post(f"{API_BASE}/login", json={"username": username, "password": password})
+            if res.status_code == 200:
+                result = res.json()
+                st.session_state["access_token"] = result["access_token"]
                 st.session_state["username"] = username
-                st.session_state["role"] = role
+                st.session_state["role"] = result.get("role", "user")
+                st.session_state["company_name"] = result.get("company_name", "")
                 st.session_state["current_page"] = "home"
                 st.rerun()
             else:
@@ -51,23 +53,19 @@ if st.session_state["current_page"] == "login":
 # ------------------------
 elif st.session_state["current_page"] == "register":
     st.title("📝 註冊新帳號")
-    
-    # 📌 這些是表單欄位（都要寫在 button 外）
     new_user = st.text_input("新帳號")
     new_pass = st.text_input("新密碼", type="password")
     company_name = st.text_input("公司名稱（可留空）")
     identity = st.radio("請選擇身分", ["使用者", "管理員"], horizontal=True)
-    is_admin = identity == "管理員"  # ✅ 判斷布林值
+    is_admin = identity == "管理員"
 
-    # 📌 寫在 button 裡的：送出 payload
     if st.button("註冊"):
         st.toast("📡 正在送出註冊資料...")
-
         payload = {
             "username": new_user,
             "password": new_pass,
             "company_name": company_name,
-            "is_admin": is_admin  # ✅ 傳出去的布林值
+            "is_admin": is_admin
         }
 
         try:
@@ -84,7 +82,6 @@ elif st.session_state["current_page"] == "register":
     if st.button("返回登入"):
         st.session_state["current_page"] = "login"
         st.rerun()
-
 
 # ------------------------
 # 首頁畫面（依身分顯示功能）
@@ -116,11 +113,11 @@ elif st.session_state["current_page"] == "home":
         if st.button("🎤 錄音語音備註"):
             st.session_state["current_page"] = "voice"
             st.rerun()
-        if st.button("🔍 查詢紀錄"):
-            st.session_state["current_page"] = "query"
-            st.rerun()
         if st.button("修改密碼"):
             st.session_state["current_page"] = "account"
+            st.rerun()
+        if st.button("🔍 查詢紀錄"):
+            st.session_state["current_page"] = "query"
             st.rerun()
 
 # ------------------------
@@ -135,7 +132,7 @@ elif st.session_state["current_page"] == "voice":
     voice_page.run()
 
 elif st.session_state["current_page"] == "account":
-    import frontend.pages.修改密碼 as acc_page
+    import frontend.pages.帳號管理 as acc_page
     acc_page.run()
 
 elif st.session_state["current_page"] == "user_manage":
