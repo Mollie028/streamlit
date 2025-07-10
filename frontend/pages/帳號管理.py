@@ -7,18 +7,26 @@ st.subheader("👥 帳號管理")
 # 顯示所有使用者列表
 st.markdown("### 所有使用者帳號")
 try:
-    res = requests.get(f"{API_BASE}/users")
-    users = res.json()
-    for user in users:
-        col1, col2, col3 = st.columns([3, 2, 2])
-        with col1:
-            st.write(f"👤 {user['username']} ({'管理員' if user['is_admin'] else '使用者'})")
-        with col2:
-            if st.button(f"修改密碼 - {user['id']}", key=f"change_{user['id']}"):
-                st.session_state["change_password_user_id"] = user['id']
-        with col3:
-            pass  # 未來可加上停權、刪除帳號等功能
-
+    res = requests.get(
+        f"{API_BASE}/users",
+        headers={"Authorization": f"Bearer {st.session_state['access_token']}"}
+    )
+    if res.status_code == 200:
+        users = res.json()
+        if isinstance(users, list):
+            for user in users:
+                col1, col2, col3 = st.columns([3, 2, 2])
+                with col1:
+                    st.write(f"👤 {user['username']} ({'管理員' if user['is_admin'] else '使用者'})")
+                with col2:
+                    if st.button(f"修改密碼 - {user['id']}", key=f"change_{user['id']}"):
+                        st.session_state["change_password_user_id"] = user['id']
+                with col3:
+                    pass  # 未來可加上停權、刪除帳號等功能
+        else:
+            st.error("回傳資料格式錯誤，應為使用者清單")
+    else:
+        st.error("API 回傳錯誤，請確認權限與登入狀態")
 except Exception as e:
     st.error("無法取得使用者清單")
     st.code(str(e))
