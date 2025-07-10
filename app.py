@@ -1,6 +1,3 @@
-# ✅ 已依照需求調整首頁功能選單與導向邏輯
-# ✅ 管理員與一般使用者的顯示功能區分＋排序調整完成
-
 import streamlit as st
 import requests
 from audio_recorder_streamlit import audio_recorder
@@ -92,42 +89,42 @@ elif st.session_state["current_page"] == "home":
 
     if role == "admin":
         st.info("🛠️ 管理員功能選單")
-        if st.button("🔐 帳號管理"):
-            st.session_state["current_page"] = "admin_account"
+        if st.button("👥 帳號管理"):
+            st.session_state["current_page"] = "account_manage"
             st.rerun()
-        if st.button("🆕 新增名片"):
-            st.session_state["current_page"] = "create_card"
+        if st.button("➕ 新增名片"):
+            st.session_state["current_page"] = "add_card"
             st.rerun()
-        if st.button("🗃️ 名片清單"):
+        if st.button("📂 名片清單"):
             st.session_state["current_page"] = "card_list"
             st.rerun()
     else:
         st.info("📋 使用者功能選單")
         if st.button("🔐 修改密碼"):
-            st.session_state["current_page"] = "account"
+            st.session_state["current_page"] = "change_password"
             st.rerun()
-        if st.button("🆕 新增名片"):
-            st.session_state["current_page"] = "create_card"
+        if st.button("➕ 新增名片"):
+            st.session_state["current_page"] = "add_card"
             st.rerun()
-        if st.button("🗃️ 名片清單"):
+        if st.button("📂 名片清單"):
             st.session_state["current_page"] = "card_list"
             st.rerun()
 
 # ------------------------
 # 各功能頁面導向
 # ------------------------
-elif st.session_state["current_page"] == "account":
+elif st.session_state["current_page"] == "account_manage":
     import frontend.pages.帳號管理 as acc_page
     acc_page.run()
 
-elif st.session_state["current_page"] == "admin_account":
-    import frontend.pages.帳號管理 as admin_page
-    admin_page.run()
-
-elif st.session_state["current_page"] == "create_card":
-    import frontend.pages.新增名片 as create_card_page
-    create_card_page.run()
+elif st.session_state["current_page"] == "add_card":
+    import frontend.pages.新增名片 as add_page
+    add_page.run()
 
 elif st.session_state["current_page"] == "card_list":
-    import frontend.pages.名片清單 as card_list_page
-    card_list_page.run()
+    import frontend.pages.名片清單 as card_page
+    card_page.run()
+
+elif st.session_state["current_page"] == "change_password":
+    import frontend.pages.修改密碼 as change_page
+    change_page.run()
