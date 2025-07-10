@@ -1,49 +1,56 @@
 import streamlit as st
 import requests
-from audio_recorder_streamlit import audio_recorder
 from core.config import API_BASE
+from components.auth import is_logged_in, logout_button
 
-st.subheader("➕ 新增名片（含語音備註）")
+# ===================== ☁️ 登入狀態區塊 =====================
+if not is_logged_in():
+    st.error("請先登入")
+    st.stop()
 
-# ----------- 上傳名片圖片辨識 -----------
-st.markdown("### 📷 上傳名片圖片")
-image_file = st.file_uploader("請選擇一張名片圖片", type=["jpg", "jpeg", "png"])
+# ===================== 🔐 登出按鈕 =====================
+logout_button()
 
-if image_file:
-    if st.button("🔍 開始辨識"):
-        with st.spinner("辨識中..."):
-            try:
-                files = {"image": image_file.getvalue()}
-                headers = {"Authorization": f"Bearer {st.session_state['access_token']}"}
-                res = requests.post(f"{API_BASE}/ocr", files=files, headers=headers)
-                if res.status_code == 200:
-                    result = res.json()
-                    st.success("✅ 名片已辨識")
-                    st.json(result)
-                else:
-                    st.error("❌ 名片辨識失敗")
-            except Exception as e:
-                st.error("❌ 名片辨識發生錯誤")
-                st.code(str(e))
+# ===================== 🙋‍♀️ 歡迎訊息 =====================
+username = st.session_state.get("username", "")
+role = st.session_state.get("role", "")
+st.success(f"🎉 歡迎 {username}（{role}）")
 
-# ----------- 錄音語音備註 -----------
-st.markdown("### 🎤 錄製語音備註")
-audio_bytes = audio_recorder(text="點擊開始 / 結束錄音", pause_threshold=3.0, sample_rate=16000)
+# ===================== 🔘 選單按鈕 =====================
+if role == "admin":
+    st.subheader("🛠 管理員功能選單")
 
-if audio_bytes:
-    st.audio(audio_bytes, format="audio/wav")
-    if st.button("🧠 傳送語音進行辨識"):
-        with st.spinner("語音辨識中..."):
-            try:
-                files = {"audio": audio_bytes}
-                headers = {"Authorization": f"Bearer {st.session_state['access_token']}"}
-                res = requests.post(f"{API_BASE}/whisper", files=files, headers=headers)
-                if res.status_code == 200:
-                    result = res.json()
-                    st.success("✅ 語音辨識完成")
-                    st.write(result["transcription"])
-                else:
-                    st.error("❌ 語音辨識失敗")
-            except Exception as e:
-                st.error("❌ 系統錯誤")
-                st.code(str(e))
+    if st.button("👥 帳號管理"):
+        st.session_state["current_page"] = "account"
+    if st.button("🆕 新增名片"):
+        st.session_state["current_page"] = "add_card"
+    if st.button("📇 名片清單"):
+        st.session_state["current_page"] = "card_list"
+
+elif role == "user":
+    st.subheader("🧰 使用者功能選單")
+
+    if st.button("🔑 修改密碼"):
+        st.session_state["current_page"] = "change_password"
+    if st.button("🆕 新增名片"):
+        st.session_state["current_page"] = "add_card"
+    if st.button("📇 名片清單"):
+        st.session_state["current_page"] = "card_list"
+
+# ===================== 📄 頁面顯示邏輯 =====================
+if "current_page" in st.session_state:
+    if st.session_state["current_page"] == "account":
+        import frontend.pages.帳號管理 as acc_page
+        acc_page.run()
+
+    elif st.session_state["current_page"] == "add_card":
+        import frontend.pages.新增名片 as add_page
+        add_page.run()
+
+    elif st.session_state["current_page"] == "card_list":
+        import frontend.pages.名片清單 as card_page
+        card_page.run()
+
+    elif st.session_state["current_page"] == "change_password":
+        import frontend.pages.修改密碼 as pw_page
+        pw_page.run()
