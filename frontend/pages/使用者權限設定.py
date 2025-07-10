@@ -50,48 +50,96 @@ def run():
     st.markdown("---")
 
     # ------------------------------------
-    # 🔐 修改使用者密碼
-    # ------------------------------------
-    st.subheader("🔐 更新使用者密碼")
-    selected_pass_user = st.selectbox("選擇帳號", usernames, key="select_pass")
-    new_pass = st.text_input("輸入新密碼", type="password")
-
-    if st.button("🔄 更新密碼"):
-        if not new_pass:
-            st.warning("⚠️ 密碼不可為空")
-        else:
-            try:
-                res = requests.put(
-                    f"{API_BASE}/update_password",
-                    params={"username": selected_pass_user, "new_password": new_pass}
-                )
-                if res.status_code == 200:
-                    st.success("✅ 密碼更新成功")
-                else:
-                    st.error(f"❌ 更新失敗：{res.text}")
-            except Exception as e:
-                st.error(f"❌ 系統錯誤：{str(e)}")
-
-    st.markdown("---")
-
-    # ------------------------------------
-    # 📋 顯示使用者表格（只限同公司）
+    # 📋 顯示使用者帳號清單（含搜尋 + 分頁）
     # ------------------------------------
     st.subheader("📋 使用者帳號清單")
+    
     same_company_users = [u for u in users if u.get("company_name") == company]
-
-    if same_company_users:
-        df = pd.DataFrame(same_company_users)
-        df = df.rename(columns={
-            "id": "ID",
-            "username": "使用者名稱",
-            "is_admin": "是否為管理員",
-            "company_name": "公司名稱"
-        })
-        df["是否為管理員"] = df["是否為管理員"].apply(lambda x: "✅" if x else "❌")
-        st.dataframe(df, use_container_width=True)
+    
+    # 🔍 搜尋欄位
+    search = st.text_input("🔍 搜尋使用者（可輸入 ID 或名稱）")
+    
+    # ➕ 處理 DataFrame
+    df = pd.DataFrame(same_company_users)
+    df = df.rename(columns={
+        "id": "ID",
+        "username": "使用者名稱",
+        "is_admin": "是否為管理員",
+        "company_name": "公司名稱"
+    })
+    df["是否為管理員"] = df["是否為管理員"].apply(lambda x: "✅" if x else "❌")
+    
+    # 🔍 過濾搜尋
+    if search:
+        df = df[
+            df["使用者名稱"].str.contains(search, case=False) |
+            df["ID"].astype(str).str.contains(search)
+        ]
+    
+    # ➗ 分頁設定
+    items_per_page = 5
+    total_pages = (len(df) - 1) // items_per_page + 1
+    if "user_table_page" not in st.session_state:
+        st.session_state["user_table_page"] = 0
+    
+    # 分頁按鈕區塊
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("⬅️ 上一頁") and st.session_state["user_table_page"] > 0:
+            st.session_state["user_table_page"] -= 1
+    with col2:
+        st.markdown(f"**第 {st.session_state['user_table_page'] + 1} 頁 / 共 {total_pages} 頁**")
+    with col3:
+        if st.button("➡️ 下一頁") and st.session_state["user_table_page"] < total_pages - 1:
+            st.session_state["user_table_page"] += 1
+    
+    # 顯示當前頁面資料
+    start = st.session_state["user_table_page"] * items_per_page
+    end = start + items_per_page
+    paged_df = df.iloc[start:end]
+    
+    # ➕ 美化樣式
+    st.markdown("""
+        <style>
+        .styled-table {
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 16px;
+            width: 100%;
+            border: 1px solid #ddd;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .styled-table th, .styled-table td {
+            border: 1px solid #ddd;
+            padding: 12px 15px;
+            text-align: center;
+        }
+        .styled-table thead {
+            background-color: #009879;
+            color: #ffffff;
+        }
+        .styled-table tbody tr:hover {
+            background-color: #f3f3f3;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # ➕ 轉換為 HTML 表格
+    def df_to_html(df):
+        html = '<table class="styled-table">'
+        html += '<thead><tr>' + ''.join(f'<th>{col}</th>' for col in df.columns) + '</tr></thead>'
+        html += '<tbody>'
+        for _, row in df.iterrows():
+            html += '<tr>' + ''.join(f'<td>{row[col]}</td>' for col in df.columns) + '</tr>'
+        html += '</tbody></table>'
+        return html
+    
+    # 顯示表格
+    if paged_df.empty:
+        st.info("查無符合條件的使用者")
     else:
-        st.info("🔍 尚無其他同公司帳號")
+        st.markdown(df_to_html(paged_df), unsafe_allow_html=True)
+
 
     # 🔚 返回首頁
     st.markdown("---")
