@@ -1,3 +1,6 @@
+# ✅ 已依照需求調整首頁功能選單與導向邏輯
+# ✅ 管理員與一般使用者的顯示功能區分＋排序調整完成
+
 import streamlit as st
 import requests
 from audio_recorder_streamlit import audio_recorder
@@ -89,56 +92,42 @@ elif st.session_state["current_page"] == "home":
 
     if role == "admin":
         st.info("🛠️ 管理員功能選單")
-        if st.button("📷 上傳名片"):
-            st.session_state["current_page"] = "ocr"
+        if st.button("🔐 帳號管理"):
+            st.session_state["current_page"] = "admin_account"
             st.rerun()
-        if st.button("🎤 錄音語音備註"):
-            st.session_state["current_page"] = "voice"
+        if st.button("🆕 新增名片"):
+            st.session_state["current_page"] = "create_card"
             st.rerun()
-        if st.button("👥 使用者權限設定"):
-            st.session_state["current_page"] = "user_manage"
-            st.rerun()
-        if st.button("🗑️ 名片刪除與編輯"):
-            st.session_state["current_page"] = "delete_edit"
+        if st.button("🗃️ 名片清單"):
+            st.session_state["current_page"] = "card_list"
             st.rerun()
     else:
         st.info("📋 使用者功能選單")
-        if st.button("📷 上傳名片"):
-            st.session_state["current_page"] = "ocr"
-            st.rerun()
-        if st.button("🎤 錄音語音備註"):
-            st.session_state["current_page"] = "voice"
-            st.rerun()
         if st.button("🔐 修改密碼"):
             st.session_state["current_page"] = "account"
             st.rerun()
-        if st.button("🔍 查詢紀錄"):
-            st.session_state["current_page"] = "query"
+        if st.button("🆕 新增名片"):
+            st.session_state["current_page"] = "create_card"
+            st.rerun()
+        if st.button("🗃️ 名片清單"):
+            st.session_state["current_page"] = "card_list"
             st.rerun()
 
 # ------------------------
 # 各功能頁面導向
 # ------------------------
-elif st.session_state["current_page"] == "ocr":
-    import frontend.pages.ocr as ocr_page
-    ocr_page.run()
-
-elif st.session_state["current_page"] == "voice":
-    import frontend.pages.語音備註 as voice_page
-    voice_page.run()
-
 elif st.session_state["current_page"] == "account":
     import frontend.pages.帳號管理 as acc_page
     acc_page.run()
 
-elif st.session_state["current_page"] == "user_manage":
-    import frontend.pages.使用者權限設定 as user_page
-    user_page.run()
+elif st.session_state["current_page"] == "admin_account":
+    import frontend.pages.帳號管理 as admin_page
+    admin_page.run()
 
-elif st.session_state["current_page"] == "delete_edit":
-    import frontend.pages.名片刪除 as del_page
-    del_page.run()
+elif st.session_state["current_page"] == "create_card":
+    import frontend.pages.新增名片 as create_card_page
+    create_card_page.run()
 
-elif st.session_state["current_page"] == "query":
-    import frontend.pages.查詢名片紀錄 as query_page
-    query_page.run()
+elif st.session_state["current_page"] == "card_list":
+    import frontend.pages.名片清單 as card_list_page
+    card_list_page.run()
