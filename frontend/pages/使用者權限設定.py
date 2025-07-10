@@ -11,7 +11,7 @@ def run():
         st.warning("⚠️ 未取得公司名稱，請重新登入")
         return
 
-    # 📡 取得同公司使用者清單
+    # 📱 取得同公司使用者清單
     try:
         res = requests.get(f"{API_BASE}/get_users", params={"company_name": company})
         if res.status_code != 200:
@@ -25,7 +25,7 @@ def run():
     usernames = [u["username"] for u in users]
 
     # ------------------------------------
-    # 🛠️ 修改使用者權限
+    # 🔨 修改使用者權限
     # ------------------------------------
     st.subheader("🧰 修改使用者權限")
     selected_user = st.selectbox("選擇帳號", usernames, key="select_role")
@@ -53,36 +53,34 @@ def run():
     # 📋 顯示使用者帳號清單（含搜尋 + 分頁）
     # ------------------------------------
     st.subheader("📋 使用者帳號清單")
-    
+
     same_company_users = [u for u in users if u.get("company_name") == company]
-    
-    # 🔍 搜尋欄位
+
     search = st.text_input("🔍 搜尋使用者（可輸入 ID 或名稱）")
-    
-    # ➕ 處理 DataFrame
+
     df = pd.DataFrame(same_company_users)
     df = df.rename(columns={
         "id": "ID",
         "username": "使用者名稱",
         "is_admin": "是否為管理員",
-        "company_name": "公司名稱"
+        "company_name": "公司名稱",
+        "note": "備註",
+        "is_active": "啟用狀態"
     })
     df["是否為管理員"] = df["是否為管理員"].apply(lambda x: "✅" if x else "❌")
-    
-    # 🔍 過濾搜尋
+    df["啟用狀態"] = df["啟用狀態"].apply(lambda x: "🟢 啟用" if x else "⛔️ 已註銷")
+
     if search:
         df = df[
             df["使用者名稱"].str.contains(search, case=False) |
             df["ID"].astype(str).str.contains(search)
         ]
-    
-    # ➗ 分頁設定
+
     items_per_page = 5
     total_pages = (len(df) - 1) // items_per_page + 1
     if "user_table_page" not in st.session_state:
         st.session_state["user_table_page"] = 0
-    
-    # 分頁按鈕區塊
+
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("⬅️ 上一頁") and st.session_state["user_table_page"] > 0:
@@ -92,13 +90,11 @@ def run():
     with col3:
         if st.button("➡️ 下一頁") and st.session_state["user_table_page"] < total_pages - 1:
             st.session_state["user_table_page"] += 1
-    
-    # 顯示當前頁面資料
+
     start = st.session_state["user_table_page"] * items_per_page
     end = start + items_per_page
     paged_df = df.iloc[start:end]
-    
-    # ➕ 美化樣式
+
     st.markdown("""
         <style>
         .styled-table {
@@ -123,8 +119,7 @@ def run():
         }
         </style>
     """, unsafe_allow_html=True)
-    
-    # ➕ 轉換為 HTML 表格
+
     def df_to_html(df):
         html = '<table class="styled-table">'
         html += '<thead><tr>' + ''.join(f'<th>{col}</th>' for col in df.columns) + '</tr></thead>'
@@ -133,15 +128,48 @@ def run():
             html += '<tr>' + ''.join(f'<td>{row[col]}</td>' for col in df.columns) + '</tr>'
         html += '</tbody></table>'
         return html
-    
-    # 顯示表格
+
     if paged_df.empty:
         st.info("查無符合條件的使用者")
     else:
         st.markdown(df_to_html(paged_df), unsafe_allow_html=True)
 
+        usernames_on_page = paged_df["使用者名稱"].tolist()
+        selected_user = st.selectbox("✏️ 選擇使用者進行備註或註銷", usernames_on_page)
 
-    # 🔚 返回首頁
+        selected_row = df[df["使用者名稱"] == selected_user]
+        note_value = selected_row["備註"].values[0] if not selected_row.empty else ""
+        note_input = st.text_input("📝 修改備註", value=note_value)
+
+        col4, col5 = st.columns(2)
+        with col4:
+            if st.button("📀 儲存備註"):
+                try:
+                    res = requests.post(f"{API_BASE}/update_note", json={"username": selected_user, "note": note_input})
+                    if res.status_code == 200:
+                        st.success("✅ 備註已更新")
+                        st.rerun()
+                    else:
+                        st.error("❌ 無法更新備註")
+                except Exception as e:
+                    st.error(f"❌ 系統錯誤：{str(e)}")
+
+        with col5:
+            user_active_status = selected_row["啟用狀態"].values[0] if not selected_row.empty else ""
+            if user_active_status == "⛔️ 已註銷":
+                st.warning("⚠️ 此帳號已註銷，無法重複操作")
+            else:
+                if st.button("⛔️ 註銷帳號"):
+                    try:
+                        res = requests.post(f"{API_BASE}/deactivate_user", json={"username": selected_user})
+                        if res.status_code == 200:
+                            st.success("⛔️ 已註銷帳號")
+                            st.rerun()
+                        else:
+                            st.error("❌ 無法註銷帳號")
+                    except Exception as e:
+                        st.error(f"❌ 系統錯誤：{str(e)}")
+
     st.markdown("---")
     if st.button("⬅️ 返回首頁"):
         st.session_state["current_page"] = "home"
