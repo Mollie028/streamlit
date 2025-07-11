@@ -17,10 +17,10 @@ try:
             for user in users:
                 col1, col2, col3 = st.columns([3, 2, 2])
                 with col1:
-                    st.write(f"👤 {user['username']} ({'管理員' if user['is_admin'] else '使用者'})")
+                    st.write(f"👤 {user['username']} ({'管理員' if user.get('is_admin') else '使用者'})")
                 with col2:
-                    if st.button(f"修改密碼 - {user['id']}", key=f"change_{user['id']}"):
-                        st.session_state["change_password_user_id"] = user['id']
+                    if st.button(f"修改密碼 - {user['username']}", key=f"change_{user['id']}"):
+                        st.session_state["change_password_username"] = user['username']
                 with col3:
                     pass  # 未來可加上停權、刪除帳號等功能
         else:
@@ -32,29 +32,29 @@ except Exception as e:
     st.code(str(e))
 
 # 修改密碼區塊
-if "change_password_user_id" in st.session_state:
-    user_id = st.session_state["change_password_user_id"]
+if "change_password_username" in st.session_state:
+    username = st.session_state["change_password_username"]
     st.markdown("---")
-    st.markdown(f"### 🔐 修改使用者（ID: {user_id}）密碼")
+    st.markdown(f"### 🔐 修改使用者「{username}」密碼")
     new_password = st.text_input("輸入新密碼", type="password")
 
     if st.button("確認修改"):
         try:
             res = requests.put(
-                f"{API_BASE}/users/{user_id}/password",
-                json={"new_password": new_password},
+                f"{API_BASE}/update_password",
+                json={"username": username, "new_password": new_password},
                 headers={"Authorization": f"Bearer {st.session_state['access_token']}"}
             )
             if res.status_code == 200:
-                st.success("密碼已成功更新！")
-                del st.session_state["change_password_user_id"]
+                st.success("✅ 密碼已成功更新！")
+                del st.session_state["change_password_username"]
                 st.rerun()
             else:
-                st.error("密碼修改失敗")
+                st.error(f"密碼修改失敗：{res.text}")
         except Exception as e:
-            st.error("系統錯誤")
+            st.error("🚨 系統錯誤")
             st.code(str(e))
 
     if st.button("取消"):
-        del st.session_state["change_password_user_id"]
+        del st.session_state["change_password_username"]
         st.rerun()
