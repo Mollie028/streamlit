@@ -1,111 +1,111 @@
 import streamlit as st
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-import requests
 import pandas as pd
+import requests
 
-# 系統設定
-st.set_page_config(page_title="帳號管理", layout="wide")
-st.title("\U0001F464 帳號管理")
-
-# 設定 API 埠域
 API_BASE = "https://ocr-whisper-production-2.up.railway.app"
 
-# --- 上方功能 ---
-
-# 取得所有用戶
-def get_users():
+# ---------------------- Functions ----------------------
+def get_user_list():
     try:
-        response = requests.get(f"{API_BASE}/users")
-        return response.json()
-    except:
+        res = requests.get(f"{API_BASE}/users")
+        return res.json()
+    except Exception as e:
+        st.error("取得使用者清單失敗")
         return []
 
-# 更新備註
 def update_note(user_id, new_note):
-    requests.put(f"{API_BASE}/users/{user_id}/note", json={"note": new_note})
+    try:
+        res = requests.put(f"{API_BASE}/users/{user_id}/note", json={"note": new_note})
+        return res.status_code == 200
+    except:
+        return False
 
-# 啟用帳號
-def activate_user(user_id):
-    requests.put(f"{API_BASE}/users/{user_id}/activate")
+def enable_account(user_id):
+    try:
+        res = requests.put(f"{API_BASE}/users/{user_id}/enable")
+        return res.status_code == 200
+    except:
+        return False
 
-# 停用帳號
-def deactivate_user(user_id):
-    requests.put(f"{API_BASE}/users/{user_id}/deactivate")
+def update_role(user_id, is_admin):
+    try:
+        res = requests.put(f"{API_BASE}/users/{user_id}/role", json={"is_admin": is_admin})
+        return res.status_code == 200
+    except:
+        return False
 
-# 修改用戶認證資格 (例如管理員)
-def update_admin_status(user_id, is_admin):
-    requests.put(f"{API_BASE}/users/{user_id}/admin", json={"is_admin": is_admin})
+# ---------------------- Page Main ----------------------
+def main():
+    st.markdown("""
+        <h2>👥 帳號管理</h2>
+        <h4>所有使用者帳號（可互動）</h4>
+    """, unsafe_allow_html=True)
 
-# --- 主畫面 ---
+    users = get_user_list()
+    if not users:
+        st.stop()
 
-with st.container():
-    st.subheader("\u6240\u6709\u7528\u6236\u5e33\u865f (\u53ef\u4e92\u52d5)")
-    users = get_users()
+    df = pd.DataFrame(users)
+    df.rename(columns={"id": "使用者編號", "username": "使用者帳號", "is_admin": "是否為管理員",
+                        "company_name": "公司名稱", "note": "備註說明", "is_active": "帳號狀態"}, inplace=True)
 
-    if users:
-        df = pd.DataFrame(users)
-        df['is_admin'] = df['is_admin'].apply(lambda x: '✅ 是' if x else '❌ 否')
-        df['is_active'] = df['is_active'].apply(lambda x: '🟢 啟用中' if x else '🔴 停用中')
+    df["是否為管理員"] = df["是否為管理員"].apply(lambda x: "✅ 是" if x else "❌ 否")
+    df["帳號狀態"] = df["帳號狀態"].apply(lambda x: "🟢 啟用中" if x else "⚫ 已停用")
 
-        gb = GridOptionsBuilder.from_dataframe(df)
-        gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
-        gb.configure_default_column(editable=True, wrapText=True, autoHeight=True)
-        gb.configure_column("note", header_name="備註說明", editable=True)
-        gb.configure_column("is_active", header_name="帳號狀態", editable=False)
-        gb.configure_column("is_admin", header_name="是否為管理員", editable=False)
-        gb.configure_selection("single")
+    gb = GridOptionsBuilder.from_dataframe(df)
+    gb.configure_pagination()
+    gb.configure_column("備註說明", editable=True)
+    grid_options = gb.build()
 
-        grid_options = gb.build()
+    grid_response = AgGrid(
+        df,
+        gridOptions=grid_options,
+        update_mode=GridUpdateMode.MANUAL,
+        height=300,
+        fit_columns_on_grid_load=True
+    )
 
-        grid_response = AgGrid(
-            df,
-            gridOptions=grid_options,
-            update_mode=GridUpdateMode.MANUAL,
-            fit_columns_on_grid_load=True,
-            height=300,
-            theme="streamlit"
-        )
+    updated_rows = grid_response["data"]
+    if st.button("💾 儲存備註修改"):
+        success_count = 0
+        for i, row in updated_rows.iterrows():
+            user_id = int(row["使用者編號"])
+            note = row["備註說明"]
+            if update_note(user_id, note):
+                success_count += 1
+        st.success(f"成功更新 {success_count} 筆備註")
 
-        selected = grid_response['selected_rows']
-        updated_df = grid_response['data']
+    st.markdown("""---
+    <h4>🔧 帳號操作區</h4>
+    """, unsafe_allow_html=True)
 
-        # 備註修改按鈕
-        if st.button("📃 儲存備註修改"):
-            for _, row in updated_df.iterrows():
-                update_note(row['id'], row['note'])
-            st.success("備註已更新！")
+    selected_id = st.number_input("請輸入要編輯的使用者 ID：", min_value=1, step=1)
+    if selected_id:
+        target_user = next((u for u in users if u["id"] == selected_id), None)
+        if target_user:
+            st.info(f"你正在編輯帳號：{target_user['username']}")
 
-        # 如果有選擇單一名用戶
-        if selected:
-            selected_user = selected[0]
-            st.divider()
-            st.subheader("⚙️ 編輯選定帳號")
-            col1, col2 = st.columns(2)
+            if not target_user["is_active"]:
+                if st.button("✅ 啟用此帳號"):
+                    if enable_account(selected_id):
+                        st.success("帳號已成功啟用")
+                    else:
+                        st.error("帳號啟用失敗")
 
-            with col1:
-                # 啟用 / 停用按鈕
-                if selected_user['is_active'] == '🔴 停用中':
-                    if st.button("✅ 啟用帳號"):
-                        activate_user(selected_user['id'])
-                        st.success("帳號已啟用")
+            new_role = st.radio("變更使用者權限：", ["管理員", "一般使用者"],
+                                index=0 if target_user["is_admin"] else 1)
+            role_bool = True if new_role == "管理員" else False
+            if st.button("✅ 確認修改權限"):
+                if update_role(selected_id, role_bool):
+                    st.success("使用者權限已更新")
                 else:
-                    if st.button("⛔ 停用帳號"):
-                        deactivate_user(selected_user['id'])
-                        st.warning("帳號已停用")
+                    st.error("修改權限失敗")
+        else:
+            st.warning("找不到對應使用者 ID")
 
-            with col2:
-                # 修改是否為管理員
-                admin_toggle = st.selectbox("修改使用者身份：", ["使用者", "管理員"], index=1 if selected_user['is_admin'] == '✅ 是' else 0)
-                is_admin = True if admin_toggle == "管理員" else False
+def run():
+    main()
 
-                if st.button("✏️ 更新使用者身份"):
-                    update_admin_status(selected_user['id'], is_admin)
-                    st.success("使用者身份已更新")
-
-    else:
-        st.warning("查無使用者資料。")
-
-# --- 返回 ---
-st.markdown("---")
-if st.button("🔙 返回首頁"):
-    st.switch_page("首頁.py")
+if __name__ == "__main__":
+    run()
