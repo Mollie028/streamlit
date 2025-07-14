@@ -1,8 +1,7 @@
-# frontend/pages/帳號管理.py
 import streamlit as st
-from st_aggrid import AgGrid, GridOptionsBuilder
-import pandas as pd
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 import requests
+import pandas as pd
 
 # -------------------------
 # API 設定
@@ -12,15 +11,15 @@ GET_USERS_URL = f"{API_URL}/users"
 UPDATE_USER_URL = f"{API_URL}/update_user"
 
 # -------------------------
-# 護助函式
+# 輔助函式
 # -------------------------
 def get_users():
     try:
-        res = requests.get(GET_USERS_URL)
-        if res.status_code == 200:
-            return res.json()
+        response = requests.get(GET_USERS_URL)
+        if response.status_code == 200:
+            return response.json()
     except Exception as e:
-        st.error(f"無法載入帳號資料: {e}")
+        st.error(f"無法載入帳號資料：{e}")
     return []
 
 def update_user(user_id, data):
@@ -28,13 +27,13 @@ def update_user(user_id, data):
         res = requests.put(f"{UPDATE_USER_URL}/{user_id}", json=data)
         return res.status_code == 200
     except Exception as e:
-        st.error(f"更新失敗: {e}")
+        st.error(f"更新失敗：{e}")
         return False
 
 # -------------------------
-# 主程式
+# 主畫面
 # -------------------------
-def main():
+def run():
     st.title("🧑‍💼 帳號管理")
     st.subheader("所有使用者帳號（可互動）")
 
@@ -49,18 +48,18 @@ def main():
                 "是否為管理員": "✅ 是" if user["is_admin"] else "❌ 否",
                 "公司名稱": user.get("company", ""),
                 "備註說明": user.get("note", ""),
-                "帳號狀態": "🟢 啟用中" if user.get("active", True) else "🔴 停用中"
+                "帳號狀態": "🟢 啟用中" if user["active"] else "🔴 停用中"
             })
 
-        df = pd.DataFrame(df_data)
-        gb = GridOptionsBuilder.from_dataframe(df)
+        gb = GridOptionsBuilder.from_dataframe(pd.DataFrame(df_data))
         gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
         gb.configure_default_column(editable=False, wrapText=True, autoHeight=True)
         grid_options = gb.build()
-        AgGrid(df, gridOptions=grid_options, height=250)
 
-        st.divider()
-        st.markdown("### ✏️ 帳號操作區")
+        AgGrid(pd.DataFrame(df_data), gridOptions=grid_options, height=300, fit_columns_on_grid_load=True)
+
+        st.markdown("---")
+        st.markdown("### 📝 帳號操作區")
         keyword = st.text_input("請輸入要編輯的使用者 ID 或帳號名稱:")
 
         selected_user = None
@@ -72,18 +71,23 @@ def main():
         if selected_user:
             st.info(f"你正在編輯帳號：**{selected_user['username']}**")
 
-            role = st.radio("變更使用者權限:", ["管理員", "一般使用者"],
-                             index=0 if selected_user["is_admin"] else 1)
+            # 權限修改
+            role = st.radio("變更使用者權限：", ["管理員", "一般使用者"], index=0 if selected_user["is_admin"] else 1)
 
-            is_active = st.checkbox("帳號啟用", value=selected_user.get("active", True))
-            new_password = st.text_input("🔐 請輸入新密碼（可空白跳過）:", type="password")
+            # 啟用或註銷帳號
+            is_active = st.checkbox("帳號啟用（取消勾選為註銷）", value=selected_user["active"])
+
+            # 修改密碼
+            new_password = st.text_input("🔐 請輸入新密碼（可空白跳過）", type="password")
+
+            # 備註說明
             new_note = st.text_input("備註說明：", value=selected_user.get("note") or "")
 
             if st.button("✅ 確認更新使用者資料"):
                 update_data = {
-                    "is_admin": role == "管理員",
+                    "is_admin": True if role == "管理員" else False,
                     "active": is_active,
-                    "note": new_note
+                    "note": new_note,
                 }
                 if new_password:
                     update_data["password"] = new_password
@@ -97,9 +101,3 @@ def main():
             st.warning("查無符合的帳號，請確認輸入是否正確。")
     else:
         st.warning("無使用者資料可顯示。")
-
-# -------------------------
-# run() 函式
-# -------------------------
-def run():
-    main()
