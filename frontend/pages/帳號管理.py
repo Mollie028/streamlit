@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import requests
-from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
+from st_aggrid import AgGrid, GridOptionsBuilder
 
 # -------------------------
 # API 設定
@@ -20,7 +20,7 @@ def get_users():
         if response.status_code == 200:
             return response.json()
     except Exception as e:
-        st.error(f"無法載入帳號資料：{e}")
+        st.error(f"❌ 無法載入帳號資料：{e}")
     return []
 
 def update_user(user_id, data):
@@ -28,7 +28,7 @@ def update_user(user_id, data):
         res = requests.put(f"{UPDATE_USER_URL}/{user_id}", json=data)
         return res.status_code == 200
     except Exception as e:
-        st.error(f"更新失敗：{e}")
+        st.error(f"❌ 更新失敗：{e}")
         return False
 
 def delete_user(user_id):
@@ -36,7 +36,7 @@ def delete_user(user_id):
         res = requests.delete(f"{DELETE_USER_URL}/{user_id}")
         return res.status_code == 200
     except Exception as e:
-        st.error(f"刪除失敗：{e}")
+        st.error(f"❌ 刪除失敗：{e}")
         return False
 
 # -------------------------
@@ -48,22 +48,21 @@ def main():
 
     users = get_users()
     if not users:
-        st.warning("無使用者資料可顯示。")
+        st.warning("⚠️ 無使用者資料可顯示。")
         return
 
     df = pd.DataFrame(users)
 
-    # 若欄位缺失則補上預設值
-    if "is_admin" not in df.columns:
-        df["is_admin"] = False
-    if "active" not in df.columns:
-        df["active"] = True
-    if "note" not in df.columns:
-        df["note"] = ""
+    # 安全檢查欄位是否存在
+    if "is_admin" not in df or "active" not in df or "note" not in df:
+        st.error("❌ API 回傳資料缺少必要欄位。請確認後端格式正確。")
+        return
 
     df["是否為管理員"] = df["is_admin"].apply(lambda x: "✅ 是" if x else "❌ 否")
     df["帳號狀態"] = df["active"].apply(lambda x: "🟢 啟用中" if x else "🔴 停用中")
     df["備註說明"] = df["note"].fillna("")
+    if "company" not in df:
+        df["company"] = ""  # 預設空值避免錯誤
 
     display_df = df[["id", "username", "是否為管理員", "company", "備註說明", "帳號狀態"]]
     display_df.columns = ["使用者編號", "使用者帳號", "是否為管理員", "公司名稱", "備註說明", "帳號狀態"]
@@ -74,10 +73,9 @@ def main():
     gb.configure_column("帳號狀態", editable=False)
     gb.configure_column("是否為管理員", editable=False)
 
-    grid_options = gb.build()
     grid_response = AgGrid(
         display_df,
-        gridOptions=grid_options,
+        gridOptions=gb.build(),
         update_mode="MODEL_CHANGED",
         height=350,
         use_container_width=True,
@@ -121,7 +119,7 @@ def main():
                     st.error("❌ 刪除失敗。")
 
     else:
-        st.caption("請點選上表中的任一列進行編輯")
+        st.caption("📌 請點選上表中的任一列進行編輯")
 
 # -------------------------
 # 包裝給 app.py 呼叫
