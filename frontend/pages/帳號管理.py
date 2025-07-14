@@ -40,7 +40,7 @@ def delete_user(user_id):
 # ---------------------------
 def main():
     st.markdown("<h1 style='color:#2c3e50;'>👨‍💼 帳號管理面板</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='color:gray;'>可查詢、編輯、停用或刪除帳號，並匯出成 Excel</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:gray;'>可查詢、編輯、停用或刪除帳號，並匯出成 CSV</p>", unsafe_allow_html=True)
 
     users = get_users()
     if not users:
@@ -57,11 +57,12 @@ def main():
     display_df.columns = ["ID", "帳號", "公司", "備註", "狀態", "管理員"]
 
     # 搜尋欄位
-    search = st.text_input("🔍 搜尋帳號或備註")
+    search = st.text_input("🔍 搜尋帳號、公司或備註")
     if search:
-        display_df = display_df[display_df.apply(lambda row: search.lower() in str(row).lower(), axis=1)]
+        display_df = display_df[display_df.apply(
+            lambda row: search.lower() in str(row).lower(), axis=1)]
 
-    # 匯出按鈕
+    # 匯出 CSV 按鈕
     csv_buffer = BytesIO()
     display_df.to_csv(csv_buffer, index=False, encoding="utf-8-sig")
     st.download_button(
@@ -71,7 +72,7 @@ def main():
         mime="text/csv",
     )
 
-    # AgGrid 表格
+    # 顯示 AgGrid 表格
     gb = GridOptionsBuilder.from_dataframe(display_df)
     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
     gb.configure_selection("single")
@@ -85,7 +86,7 @@ def main():
     )
 
     selected = grid["selected_rows"]
-    if selected:
+    if selected and len(selected) > 0:
         row = selected[0]
         user_id = row["ID"]
         username = row["帳號"]
@@ -105,19 +106,21 @@ def main():
                     update_data["password"] = new_password
                 success = update_user(user_id, update_data)
                 if success:
-                    st.success("✅ 已成功更新")
+                    st.success("✅ 已成功更新，請重新整理頁面查看變更")
                 else:
                     st.error("❌ 更新失敗")
 
         with col2:
             if st.button("🗑️ 刪除帳號"):
-                if st.checkbox("⚠️ 確認永久刪除"):
+                if st.checkbox("⚠️ 確認永久刪除", key="confirm_delete"):
                     if delete_user(user_id):
-                        st.success("✅ 已刪除帳號")
+                        st.success("✅ 已刪除帳號，請重新整理頁面")
                     else:
                         st.error("❌ 刪除失敗")
+    else:
+        st.info("👈 請點選上方表格中的一筆帳號進行編輯")
 
-    # 自訂 CSS 美化
+    # CSS 美化
     st.markdown("""
         <style>
         .stTextInput>div>div>input {
@@ -130,9 +133,13 @@ def main():
             border-radius: 5px;
             margin-bottom: 10px;
         }
+        .ag-root-wrapper {
+            border-radius: 6px;
+            overflow: hidden;
+        }
         </style>
     """, unsafe_allow_html=True)
 
-# 外部呼叫用
+# 外部呼叫
 def run():
     main()
