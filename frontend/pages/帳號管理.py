@@ -48,13 +48,14 @@ def main():
         return
 
     df = pd.DataFrame(users)
+
+    # 顯示欄位整理（保留原始欄位名，顯示用加一層欄位）
     df["帳號狀態"] = df["is_active"].apply(lambda x: "🟢 啟用" if x else "🔴 停用")
     df["是否管理員"] = df["is_admin"].apply(lambda x: "✅ 是" if x else "❌ 否")
     df["備註"] = df["note"].fillna("")
     df["公司"] = df["company_name"].fillna("")
 
     display_df = df[["id", "username", "公司", "備註", "帳號狀態", "是否管理員"]]
-    display_df.columns = ["ID", "帳號", "公司", "備註", "狀態", "管理員"]
 
     # 搜尋欄位
     search = st.text_input("🔍 搜尋帳號、公司或備註")
@@ -75,7 +76,7 @@ def main():
     # 顯示 AgGrid 表格
     gb = GridOptionsBuilder.from_dataframe(display_df)
     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
-    gb.configure_selection("single")
+    gb.configure_selection("single", use_checkbox=True)
     gb.configure_default_column(editable=False, wrapText=True, autoHeight=True)
     grid = AgGrid(
         display_df,
@@ -87,17 +88,18 @@ def main():
 
     selected = grid["selected_rows"]
 
-    if selected is not None and len(selected) > 0:
+    if selected and len(selected) > 0:
+        # 注意：AgGrid 回傳的是原本欄位名稱
         row = selected[0]
-        user_id = row["ID"]
-        username = row["帳號"]
+        user_id = row["id"]
+        username = row["username"]
 
         st.markdown("---")
         st.markdown(f"<h4 style='color:#34495e;'>🛠️ 編輯帳號：{username} (ID: {user_id})</h4>", unsafe_allow_html=True)
 
-        new_note = st.text_input("✏️ 備註內容", value=row["備註"])
+        new_note = st.text_input("✏️ 備註內容", value=row.get("備註", ""))
         new_password = st.text_input("🔐 新密碼（可留空）", type="password")
-        active = st.checkbox("✅ 是否啟用", value=row["狀態"] == "🟢 啟用")
+        active = st.checkbox("✅ 是否啟用", value=row.get("帳號狀態", "") == "🟢 啟用")
 
         col1, col2 = st.columns(2)
         with col1:
