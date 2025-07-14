@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import requests
-from st_aggrid import AgGrid, GridOptionsBuilder
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
 # -------------------------
 # API 設定
@@ -31,7 +31,7 @@ def update_user(user_id, data):
         return False
 
 # -------------------------
-# 主畫面邏輯（for app.py 調用）
+# 畫面主程式
 # -------------------------
 def run():
     st.title("👨‍💼 帳號管理")
@@ -51,61 +51,39 @@ def run():
                 "帳號狀態": "🟢 啟用中" if user.get("active", False) else "🔴 停用中"
             })
 
-        gb = GridOptionsBuilder.from_dataframe(pd.DataFrame(df_data))
+        df = pd.DataFrame(df_data)
+
+        gb = GridOptionsBuilder.from_dataframe(df)
         gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
-        gb.configure_default_column(editable=False, wrapText=True, autoHeight=True)
+        gb.configure_default_column(editable=True, wrapText=True, autoHeight=True)
+        gb.configure_column("備註說明", editable=True)
         grid_options = gb.build()
 
-        AgGrid(
-            pd.DataFrame(df_data),
+        grid_response = AgGrid(
+            df,
             gridOptions=grid_options,
             height=300,
             use_container_width=True,
+            update_mode=GridUpdateMode.MANUAL,
         )
 
-        st.divider()
-        st.markdown("### 🖋️ 帳號操作區")
+        updated_rows = grid_response["data"]
+        modified_rows = grid_response.get("updated_rows", [])
 
-        keyword = st.text_input("請輸入要編輯的使用者 ID 或帳號名稱:")
-
-        selected_user = None
-        for u in users:
-            if keyword and (str(u.get("id")) == keyword or u.get("username") == keyword):
-                selected_user = u
-                break
-
-        if selected_user:
-            st.info(f"你正在編輯帳號：**{selected_user['username']}**")
-
-            # 權限修改
-            role = st.radio("變更使用者權限：", ["管理員", "一般使用者"],
-                             index=0 if selected_user.get("is_admin") else 1)
-
-            # 帳號啟用/註銷
-            is_active = st.checkbox("帳號啟用", value=selected_user.get("active", False))
-
-            # 修改密碼
-            new_password = st.text_input("🔐 請輸入新密碼（可空白跳過）：", type="password")
-
-            # 備註說明
-            new_note = st.text_input("備註說明：", value=selected_user.get("note") or "")
-
-            if st.button("✅ 確認更新使用者資料"):
+        if st.button("✅ 儲存所有變更"):
+            success_count = 0
+            for index, row in updated_rows.iterrows():
+                user_id = row["使用者編號"]
+                is_admin = row["是否為管理員"] == "✅ 是"
+                active = row["帳號狀態"] == "🟢 啟用中"
+                note = row["備註說明"]
                 update_data = {
-                    "is_admin": role == "管理員",
-                    "active": is_active,
-                    "note": new_note,
+                    "is_admin": is_admin,
+                    "active": active,
+                    "note": note
                 }
-                if new_password:
-                    update_data["password"] = new_password
-
-                success = update_user(selected_user["id"], update_data)
-                if success:
-                    st.success("✅ 使用者資料更新成功！請重新整理以查看變更。")
-                else:
-                    st.error("❌ 更新失敗，請稍後再試。")
-        else:
-            if keyword:
-                st.warning("查無符合的帳號，請確認輸入是否正確。")
+                if update_user(user_id, update_data):
+                    success_count += 1
+            st.success(f"✅ 成功更新 {success_count} 筆使用者資料！")
     else:
         st.warning("無使用者資料可顯示。")
