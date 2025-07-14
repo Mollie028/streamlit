@@ -53,7 +53,7 @@ def main():
 
     df = pd.DataFrame(users)
     df["是否為管理員"] = df["is_admin"].apply(lambda x: "✅ 是" if x else "❌ 否")
-    df["帳號狀態"] = df["active"].apply(lambda x: "🟢 啟用中" if x else "🔴 停用中")
+    df["帳號狀態"] = df.get("active", True).apply(lambda x: "🟢 啟用中" if x else "🔴 停用中")
     df["備註說明"] = df["note"].fillna("")
 
     display_df = df[["id", "username", "是否為管理員", "company", "note", "帳號狀態"]]
