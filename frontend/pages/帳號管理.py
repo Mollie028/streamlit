@@ -53,16 +53,19 @@ def main():
 
     df = pd.DataFrame(users)
 
-    # 安全檢查欄位是否存在
-    if "is_admin" not in df or "active" not in df or "note" not in df:
-        st.error("❌ API 回傳資料缺少必要欄位。請確認後端格式正確。")
-        return
+    # 檢查必要欄位是否存在
+    required_columns = ["id", "username", "is_admin", "is_active", "note"]
+    for col in required_columns:
+        if col not in df.columns:
+            st.error(f"❌ API 回傳資料缺少欄位 `{col}`，請確認後端格式正確。")
+            return
 
+    # 顯示處理
     df["是否為管理員"] = df["is_admin"].apply(lambda x: "✅ 是" if x else "❌ 否")
-    df["帳號狀態"] = df["active"].apply(lambda x: "🟢 啟用中" if x else "🔴 停用中")
+    df["帳號狀態"] = df["is_active"].apply(lambda x: "🟢 啟用中" if x else "🔴 停用中")
     df["備註說明"] = df["note"].fillna("")
     if "company" not in df:
-        df["company"] = ""  # 預設空值避免錯誤
+        df["company"] = ""
 
     display_df = df[["id", "username", "是否為管理員", "company", "備註說明", "帳號狀態"]]
     display_df.columns = ["使用者編號", "使用者帳號", "是否為管理員", "公司名稱", "備註說明", "帳號狀態"]
@@ -100,7 +103,7 @@ def main():
         if st.button("✅ 確認更新"):
             update_data = {
                 "note": new_note,
-                "active": active
+                "is_active": active
             }
             if new_password:
                 update_data["password"] = new_password
@@ -117,7 +120,6 @@ def main():
                     st.success("✅ 使用者已刪除。請重新整理。")
                 else:
                     st.error("❌ 刪除失敗。")
-
     else:
         st.caption("📌 請點選上表中的任一列進行編輯")
 
