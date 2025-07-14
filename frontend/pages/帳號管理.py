@@ -39,7 +39,7 @@ def delete_user(user_id):
 # ---------------------------
 def main():
     st.markdown("<h1 style='color:#2c3e50;'>👨‍💼 帳號管理面板</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='color:gray;'>可直接編輯表格欄位、搜尋帳號、儲存變更、停用或刪除帳號</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:gray;'>可編輯帳號資料，點選一列後可儲存／停用／刪除</p>", unsafe_allow_html=True)
 
     users = get_users()
     if not users:
@@ -47,31 +47,43 @@ def main():
         return
 
     df = pd.DataFrame(users)
-    df["備註"] = df["note"].fillna("")
-    df["公司"] = df["company_name"].fillna("")
 
-    # 🔍 搜尋
+    # ✅ 加上中文欄位顯示
+    df = df.rename(columns={
+        "id": "ID",
+        "username": "帳號",
+        "is_admin": "管理員",
+        "company_name": "公司",
+        "is_active": "啟用中",
+        "note": "備註",
+    })
+
+    # ✅ 處理空值
+    df["備註"] = df["備註"].fillna("")
+    df["公司"] = df["公司"].fillna("")
+
+    # 🔍 搜尋欄位
     search = st.text_input("🔍 搜尋帳號、公司或備註")
     if search:
         df = df[df.apply(lambda row: search.lower() in str(row).lower(), axis=1)]
 
-    # 📤 匯出按鈕
+    # 📤 匯出 CSV
     csv_buffer = BytesIO()
     df.to_csv(csv_buffer, index=False, encoding="utf-8-sig")
     st.download_button(
         label="📤 匯出帳號清單 (CSV)",
         data=csv_buffer.getvalue(),
-        file_name="user_list.csv",
+        file_name="帳號清單.csv",
         mime="text/csv",
     )
 
-    # ⚙️ 設定 AgGrid
+    # ✅ 設定 AgGrid 表格
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
     gb.configure_default_column(editable=False, wrapText=True, autoHeight=True)
     gb.configure_column("備註", editable=True)
-    gb.configure_column("is_active", editable=True)
-    gb.configure_column("is_admin", editable=True)
+    gb.configure_column("啟用中", editable=True)
+    gb.configure_column("管理員", editable=True)
     gb.configure_selection("single", use_checkbox=True)
 
     grid = AgGrid(
@@ -83,18 +95,18 @@ def main():
     )
 
     updated_df = grid["data"]
-    selected = grid["selected_rows"]
+    selected = grid.get("selected_rows", [])
 
-    # ✅ 顯示選取行的操作區
-    if selected:
+    # ✅ 避免 ValueError：DataFrame 的布林轉換問題
+    if selected and isinstance(selected, list):
         row = selected[0]
-        user_id = row["id"]
+        user_id = row["ID"]
         new_note = row["備註"]
-        new_active = row["is_active"]
-        new_admin = row["is_admin"]
+        new_active = row["啟用中"]
+        new_admin = row["管理員"]
 
         with st.expander("🛠️ 編輯操作區", expanded=True):
-            st.write(f"✏️ 帳號：**{row['username']}** (ID: `{user_id}`)")
+            st.write(f"✏️ 帳號：**{row['帳號']}** (ID: `{user_id}`)")
             col1, col2, col3 = st.columns(3)
 
             with col1:
@@ -105,7 +117,7 @@ def main():
                         "is_admin": new_admin
                     }
                     if update_user(user_id, payload):
-                        st.success("✅ 更新成功，請重新整理查看變更")
+                        st.success("✅ 已更新成功，請重新整理查看")
                     else:
                         st.error("❌ 更新失敗")
 
