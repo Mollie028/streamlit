@@ -1,8 +1,7 @@
 import streamlit as st
 import pandas as pd
 import requests
-from st_aggrid import AgGrid, GridOptionsBuilder
-from st_aggrid.shared import GridUpdateMode
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from io import BytesIO
 
 API_URL = "https://ocr-whisper-production-2.up.railway.app"
@@ -27,20 +26,12 @@ def update_user(user_id, data):
         st.error(f"❌ 更新失敗：{e}")
         return False
 
-def delete_user(user_id):
-    try:
-        res = requests.delete(f"{API_URL}/delete_user/{user_id}")
-        return res.status_code == 200
-    except Exception as e:
-        st.error(f"❌ 刪除失敗：{e}")
-        return False
-
 # ---------------------------
 # UI Main Function
 # ---------------------------
 def main():
     st.markdown("<h1 style='color:#2c3e50;'>👨‍💼 帳號管理面板</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='color:gray;'>可查詢、編輯、停用或刪除帳號，並匯出成 CSV</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:gray;'>可直接編輯表格欄位，或匯出帳號清單</p>", unsafe_allow_html=True)
 
     users = get_users()
     if not users:
@@ -48,24 +39,17 @@ def main():
         return
 
     df = pd.DataFrame(users)
-
-    # 顯示欄位整理（保留原始欄位名，顯示用加一層欄位）
-    df["帳號狀態"] = df["is_active"].apply(lambda x: "🟢 啟用" if x else "🔴 停用")
-    df["是否管理員"] = df["is_admin"].apply(lambda x: "✅ 是" if x else "❌ 否")
     df["備註"] = df["note"].fillna("")
     df["公司"] = df["company_name"].fillna("")
-
-    display_df = df[["id", "username", "公司", "備註", "帳號狀態", "是否管理員"]]
 
     # 搜尋欄位
     search = st.text_input("🔍 搜尋帳號、公司或備註")
     if search:
-        display_df = display_df[display_df.apply(
-            lambda row: search.lower() in str(row).lower(), axis=1)]
+        df = df[df.apply(lambda row: search.lower() in str(row).lower(), axis=1)]
 
     # 匯出 CSV 按鈕
     csv_buffer = BytesIO()
-    display_df.to_csv(csv_buffer, index=False, encoding="utf-8-sig")
+    df.to_csv(csv_buffer, index=False, encoding="utf-8-sig")
     st.download_button(
         label="📤 匯出帳號清單 (CSV)",
         data=csv_buffer.getvalue(),
@@ -73,55 +57,46 @@ def main():
         mime="text/csv",
     )
 
-    # 顯示 AgGrid 表格
-    gb = GridOptionsBuilder.from_dataframe(display_df)
+    # 顯示可編輯 AgGrid 表格
+    gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
-    gb.configure_selection("single", use_checkbox=True)
     gb.configure_default_column(editable=False, wrapText=True, autoHeight=True)
+    gb.configure_column("備註", editable=True)
+    gb.configure_column("is_active", editable=True)
+    gb.configure_column("is_admin", editable=True)
+    gb.configure_selection("single", use_checkbox=True)
+
     grid = AgGrid(
-        display_df,
+        df,
         gridOptions=gb.build(),
-        update_mode=GridUpdateMode.SELECTION_CHANGED,
-        height=400,
+        update_mode=GridUpdateMode.MODEL_CHANGED,
+        height=450,
         theme="streamlit",
     )
 
+    updated_df = grid["data"]
     selected = grid["selected_rows"]
 
-    if selected and len(selected) > 0:
-        # 注意：AgGrid 回傳的是原本欄位名稱
+    # 若有選取且資料異動
+    if selected:
         row = selected[0]
         user_id = row["id"]
-        username = row["username"]
+        new_note = row["備註"]
+        new_active = row["is_active"]
+        new_admin = row["is_admin"]
 
-        st.markdown("---")
-        st.markdown(f"<h4 style='color:#34495e;'>🛠️ 編輯帳號：{username} (ID: {user_id})</h4>", unsafe_allow_html=True)
-
-        new_note = st.text_input("✏️ 備註內容", value=row.get("備註", ""))
-        new_password = st.text_input("🔐 新密碼（可留空）", type="password")
-        active = st.checkbox("✅ 是否啟用", value=row.get("帳號狀態", "") == "🟢 啟用")
-
-        col1, col2 = st.columns(2)
-        with col1:
+        with st.expander("🛠️ 編輯操作區"):
+            st.write(f"✏️ 帳號：{row['username']} (ID: {user_id})")
             if st.button("💾 儲存變更"):
-                update_data = {"note": new_note, "active": active}
-                if new_password:
-                    update_data["password"] = new_password
-                success = update_user(user_id, update_data)
-                if success:
-                    st.success("✅ 已成功更新，請重新整理頁面查看變更")
+                payload = {
+                    "note": new_note,
+                    "active": new_active,
+                    "is_admin": new_admin
+                }
+                if update_user(user_id, payload):
+                    st.success("✅ 更新成功，請重新整理查看變更")
                 else:
                     st.error("❌ 更新失敗")
-
-        with col2:
-            if st.button("🗑️ 刪除帳號"):
-                if st.checkbox("⚠️ 確認永久刪除", key="confirm_delete"):
-                    if delete_user(user_id):
-                        st.success("✅ 已刪除帳號，請重新整理頁面")
-                    else:
-                        st.error("❌ 刪除失敗")
-    else:
-        st.info("👈 請點選上方表格中的一筆帳號進行編輯")
 
     # CSS 美化
     st.markdown("""
