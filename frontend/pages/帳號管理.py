@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import requests
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
+from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 
 # -------------------------
 # API 設定
@@ -40,92 +40,82 @@ def delete_user(user_id):
         return False
 
 # -------------------------
-# 畫面
+# 主畫面邏輯
 # -------------------------
-st.title("👨\u200d💼 帳號管理")
-st.subheader("所有使用者帳號（可編輯、刪除）")
+def main():
+    st.title("👨‍💼 帳號管理")
+    st.subheader("所有使用者帳號（可互動編輯）")
 
-users = get_users()
+    users = get_users()
+    if not users:
+        st.warning("無使用者資料可顯示。")
+        return
 
-if users:
-    df_data = []
-    for user in users:
-        df_data.append({
-            "使用者編號": user.get("id"),
-            "使用者帳號": user.get("username"),
-            "是否為管理員": user.get("is_admin", False),
-            "公司名稱": user.get("company", ""),
-            "備註說明": user.get("note", ""),
-            "帳號狀態": user.get("active", False),
-        })
+    df = pd.DataFrame(users)
+    df["是否為管理員"] = df["is_admin"].apply(lambda x: "✅ 是" if x else "❌ 否")
+    df["帳號狀態"] = df["active"].apply(lambda x: "🟢 啟用中" if x else "🔴 停用中")
+    df["備註說明"] = df["note"].fillna("")
 
-    df = pd.DataFrame(df_data)
+    display_df = df[["id", "username", "是否為管理員", "company", "note", "帳號狀態"]]
+    display_df.columns = ["使用者編號", "使用者帳號", "是否為管理員", "公司名稱", "備註說明", "帳號狀態"]
 
-    gb = GridOptionsBuilder.from_dataframe(df)
-    gb.configure_default_column(editable=True, wrapText=True, autoHeight=True)
+    gb = GridOptionsBuilder.from_dataframe(display_df)
     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
-    gb.configure_grid_options(domLayout='normal')
-    gb.configure_column("使用者帳號", editable=False)
-    gb.configure_column("使用者編號", editable=False)
-    gb.configure_column("帳號狀態", cellEditor="agSelectCellEditor", cellEditorParams={"values": [True, False]})
-    gb.configure_column("是否為管理員", cellEditor="agSelectCellEditor", cellEditorParams={"values": [True, False]})
+    gb.configure_default_column(editable=True, wrapText=True, autoHeight=True)
+    gb.configure_column("帳號狀態", editable=False)
+    gb.configure_column("是否為管理員", editable=False)
 
     grid_options = gb.build()
-
-    grid_return = AgGrid(
-        df,
+    grid_response = AgGrid(
+        display_df,
         gridOptions=grid_options,
-        update_mode=GridUpdateMode.MANUAL,
-        fit_columns_on_grid_load=True,
+        update_mode="MODEL_CHANGED",
+        height=350,
         use_container_width=True,
-        height=400,
+        allow_unsafe_jscode=True
     )
 
-    edited_rows = grid_return["data"]
+    st.divider()
+    st.markdown("### 🖋️ 編輯選擇的使用者資料")
 
-    st.markdown("---")
-    st.markdown("### 🔐 修改密碼 / 🗑️ 刪除帳號")
-    selected_id = st.text_input("請輸入欲修改或刪除的使用者 ID：")
+    selected_rows = grid_response["selected_rows"]
+    if selected_rows:
+        row = selected_rows[0]
+        user_id = row["使用者編號"]
+        username = row["使用者帳號"]
 
-    if selected_id:
-        user = next((u for u in users if str(u.get("id")) == selected_id), None)
-        if user:
-            st.info(f"目前選擇帳號：{user['username']}")
+        st.info(f"🧾 你正在編輯帳號：**{username}** (ID: {user_id})")
 
-            with st.expander("🔐 修改密碼"):
-                new_pass = st.text_input("請輸入新密碼", type="password")
-                if st.button("✅ 確認修改密碼"):
-                    if new_pass:
-                        success = update_user(user["id"], {"password": new_pass})
-                        if success:
-                            st.success("密碼更新成功！")
-                        else:
-                            st.error("密碼更新失敗。")
+        new_note = st.text_input("備註說明：", value=row["備註說明"])
+        new_password = st.text_input("新密碼（可留空跳過）", type="password")
+        active = st.checkbox("✅ 啟用帳號", value=row["帳號狀態"] == "🟢 啟用中")
 
-            with st.expander("🗑️ 刪除帳號"):
-                if st.button("⚠️ 確認刪除帳號"):
-                    confirm = st.checkbox("我確認要刪除此帳號")
-                    if confirm:
-                        success = delete_user(user["id"])
-                        if success:
-                            st.success("帳號已刪除，請重新整理頁面")
-                        else:
-                            st.error("刪除失敗。")
-        else:
-            st.warning("查無使用者，請確認 ID 是否正確")
-
-    st.markdown("---")
-    if st.button("💾 儲存上方表格變更"):
-        updated_count = 0
-        for _, row in edited_rows.iterrows():
-            uid = row["使用者編號"]
-            payload = {
-                "is_admin": row["是否為管理員"],
-                "note": row["備註說明"],
-                "active": row["帳號狀態"]
+        if st.button("✅ 確認更新"):
+            update_data = {
+                "note": new_note,
+                "active": active
             }
-            if update_user(uid, payload):
-                updated_count += 1
-        st.success(f"✅ 已更新 {updated_count} 筆使用者資料")
-else:
-    st.warning("無使用者資料可顯示。")
+            if new_password:
+                update_data["password"] = new_password
+            success = update_user(user_id, update_data)
+            if success:
+                st.success("✅ 使用者資料更新成功，請重新整理！")
+            else:
+                st.error("❌ 更新失敗，請稍後再試。")
+
+        if st.button("🗑️ 刪除帳號", type="primary"):
+            confirm = st.checkbox("我確認要永久刪除此帳號！")
+            if confirm:
+                if delete_user(user_id):
+                    st.success("✅ 使用者已刪除。請重新整理。")
+                else:
+                    st.error("❌ 刪除失敗。")
+
+    else:
+        st.caption("請點選上表中的任一列進行編輯")
+
+# -------------------------
+# 包裝給 app.py 呼叫
+# -------------------------
+def run():
+    main()
