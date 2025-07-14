@@ -86,7 +86,8 @@ def main():
     )
 
     selected = grid["selected_rows"]
-    if selected and len(selected) > 0:
+
+    if selected is not None and len(selected) > 0:
         row = selected[0]
         user_id = row["ID"]
         username = row["帳號"]
