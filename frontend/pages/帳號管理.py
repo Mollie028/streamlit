@@ -52,11 +52,20 @@ def main():
         return
 
     df = pd.DataFrame(users)
+
+    # 若欄位缺失則補上預設值
+    if "is_admin" not in df.columns:
+        df["is_admin"] = False
+    if "active" not in df.columns:
+        df["active"] = True
+    if "note" not in df.columns:
+        df["note"] = ""
+
     df["是否為管理員"] = df["is_admin"].apply(lambda x: "✅ 是" if x else "❌ 否")
-    df["帳號狀態"] = df.get("active", True).apply(lambda x: "🟢 啟用中" if x else "🔴 停用中")
+    df["帳號狀態"] = df["active"].apply(lambda x: "🟢 啟用中" if x else "🔴 停用中")
     df["備註說明"] = df["note"].fillna("")
 
-    display_df = df[["id", "username", "是否為管理員", "company", "note", "帳號狀態"]]
+    display_df = df[["id", "username", "是否為管理員", "company", "備註說明", "帳號狀態"]]
     display_df.columns = ["使用者編號", "使用者帳號", "是否為管理員", "公司名稱", "備註說明", "帳號狀態"]
 
     gb = GridOptionsBuilder.from_dataframe(display_df)
