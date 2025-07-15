@@ -1,94 +1,98 @@
 import streamlit as st
 import requests
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
-from streamlit_extras.stylable_container import stylable_container
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+import pandas as pd
 
-API_BASE = "https://ocr-whisper-production-2.up.railway.app"
+API_BASE = st.secrets["API_BASE"]
 
-# -------- 取得帳號清單 -------- #
-@st.cache_data
+st.set_page_config(page_title="帳號管理", layout="wide")
+st.markdown("## 🧑‍💼 帳號管理區")
 
+# 取得帳號資料
 def get_users():
-    res = requests.get(f"{API_BASE}/users")
-    if res.status_code == 200:
-        return res.json()
-    else:
-        st.error("無法取得帳號資料")
+    try:
+        res = requests.get(f"{API_BASE}/users")
+        res.raise_for_status()
+        users = res.json()
+        for user in users:
+            user["啟用中"] = user.get("enabled", True)
+        return users
+    except Exception as e:
+        st.error(f"無法取得帳號資料：{e}")
         return []
 
-# -------- 更新帳號狀態 -------- #
-def update_user_status(user_id, enabled):
-    requests.put(f"{API_BASE}/update_user_status/{user_id}", json={"enabled": enabled})
+# 顯示搜尋框
+search_term = st.text_input("🔍 搜尋帳號／公司／備註")
 
-# -------- 更新帳號角色 -------- #
-def update_user_role(user_id, role):
-    requests.put(f"{API_BASE}/update_user_role/{user_id}", json={"role": role})
+# 取得資料
+users_data = get_users()
+if search_term:
+    users_data = [u for u in users_data if search_term.lower() in str(u).lower()]
 
-# -------- 更新帳號備註 -------- #
-def update_user_note(user_id, note):
-    requests.put(f"{API_BASE}/update_user_note/{user_id}", json={"note": note})
+# 資料轉為 DataFrame
+if users_data:
+    df = pd.DataFrame(users_data)
+    df.rename(columns={
+        "id": "ID",
+        "username": "帳號",
+        "is_admin": "管理員",
+        "company": "公司",
+        "啟用中": "啟用中",
+        "note": "備註"
+    }, inplace=True)
 
-# -------- 顯示修改密碼欄 -------- #
-def modify_password(user_id):
-    with stylable_container(key="pwd", css="border: 1px solid #ccc; padding: 1rem; margin-top: 2rem;"):
-        st.subheader("🔐 修改密碼")
-        new_password = st.text_input("請輸入新密碼", type="password")
-        if st.button("🛠️ 修改密碼"):
-            if new_password:
-                res = requests.put(f"{API_BASE}/update_user_password/{user_id}", json={"new_password": new_password})
-                if res.status_code == 200:
+    # 建立 Grid
+    gb = GridOptionsBuilder.from_dataframe(df[["ID", "帳號", "管理員", "公司", "啟用中", "備註"]])
+    gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
+    gb.configure_default_column(editable=True)
+    gb.configure_column("ID", editable=False)
+    gb.configure_column("帳號", editable=False)
+    gb.configure_selection("multiple", use_checkbox=True)
+    gridOptions = gb.build()
+
+    st.markdown("### 📋 帳號清單")
+    grid_response = AgGrid(
+        df,
+        gridOptions=gridOptions,
+        update_mode=GridUpdateMode.VALUE_CHANGED | GridUpdateMode.SELECTION_CHANGED,
+        fit_columns_on_grid_load=True,
+        allow_unsafe_jscode=True,
+        theme="balham"
+    )
+
+    selected_rows = grid_response["selected_rows"]
+    edited_df = grid_response["data"]
+
+    # 儲存變更按鈕與功能
+    if st.button("💾 儲存變更"):
+        for index, row in edited_df.iterrows():
+            user_id = row["ID"]
+            payload = {
+                "is_admin": row["管理員"],
+                "enabled": row["啟用中"],
+                "note": row["備註"]
+            }
+            try:
+                res = requests.put(f"{API_BASE}/update_user/{user_id}", json=payload)
+                res.raise_for_status()
+            except Exception as e:
+                st.error(f"更新 ID {user_id} 失敗：{e}")
+        st.success("✅ 所有變更已儲存！")
+
+    # 顯示修改密碼欄位
+    if selected_rows:
+        if len(selected_rows) == 1:
+            st.markdown("---")
+            st.markdown("### 🔐 修改密碼")
+            new_pw = st.text_input("請輸入新密碼", type="password")
+            if st.button("🛠 修改密碼"):
+                user_id = selected_rows[0]["ID"]
+                try:
+                    res = requests.put(f"{API_BASE}/update_user_password/{user_id}", json={"password": new_pw})
+                    res.raise_for_status()
                     st.success("密碼修改成功！")
-                else:
-                    st.error("密碼修改失敗")
-            else:
-                st.warning("請輸入新密碼")
+                except Exception as e:
+                    st.error(f"密碼修改失敗：{e}")
 
-# -------- AgGrid 表格 -------- #
-st.markdown("## 🧑‍💼 帳號管理系統")
-st.markdown("🔍 搜尋帳號 / 公司 / 備註")
-
-users = get_users()
-
-for user in users:
-    user["啟用中"] = user["enabled"]
-    user["管理員"] = user["role"] == "admin"
-
-gb = GridOptionsBuilder.from_dataframe(
-    pd.DataFrame(users)[["id", "username", "管理員", "company", "啟用中", "note"]]
-)
-gb.configure_default_column(editable=True, resizable=True)
-gb.configure_column("id", width=70)
-gb.configure_column("username", header_name="帳號", width=150)
-gb.configure_column("管理員", cellEditor="agCheckboxCellEditor", width=100)
-gb.configure_column("啟用中", cellEditor="agCheckboxCellEditor", width=100)
-gb.configure_column("note", header_name="備註", width=250)
-gb.configure_selection("multiple", use_checkbox=True)
-gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
-
-response = AgGrid(
-    pd.DataFrame(users),
-    gridOptions=gb.build(),
-    height=400,
-    update_mode=GridUpdateMode.MODEL_CHANGED,
-    fit_columns_on_grid_load=True,
-    allow_unsafe_jscode=True,
-    theme="alpine"
-)
-
-selected_rows = response["selected_rows"]
-edited_rows = response["data"]
-
-# -------- 儲存變更 -------- #
-st.markdown("---")
-if st.button("💾 儲存變更"):
-    for edited in edited_rows:
-        user_id = edited["id"]
-        update_user_status(user_id, edited["啟用中"])
-        update_user_role(user_id, "admin" if edited["管理員"] else "user")
-        update_user_note(user_id, edited.get("note", ""))
-    st.success("✅ 所有變更已儲存")
-
-# -------- 密碼修改區塊 -------- #
-if selected_rows:
-    selected_user = selected_rows[0]
-    modify_password(selected_user["id"])
+else:
+    st.warning("⚠️ 無帳號資料可顯示")
