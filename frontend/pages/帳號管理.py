@@ -93,19 +93,19 @@ def main():
     updated_df = grid["data"]
     selected = grid.get("selected_rows", [])
 
-    if selected and isinstance(selected, list) and len(selected) > 0:
+    if isinstance(selected, list) and len(selected) > 0 and isinstance(selected[0], dict):
         row = selected[0]
-        st.info(f"✏️ 目前選取帳號：**{row['帳號']}**")
+        st.info(f"✏️ 目前選取帳號：**{row.get('帳號', '未知')}**")
 
         col1, col2, col3 = st.columns(3)
 
         with col1:
             if st.button("💾 儲存變更"):
-                user_id = row["ID"]
+                user_id = row.get("ID")
                 payload = {
-                    "note": row["備註"],
-                    "active": row["啟用中"],
-                    "is_admin": row["管理員"]
+                    "note": row.get("備註", ""),
+                    "active": row.get("啟用中", False),
+                    "is_admin": row.get("管理員", False)
                 }
                 if update_user(user_id, payload):
                     st.success("✅ 資料已儲存")
@@ -114,20 +114,19 @@ def main():
 
         with col2:
             if st.button("🛑 停用帳號"):
-                if update_user(row["ID"], {"active": False}):
+                if update_user(row.get("ID"), {"active": False}):
                     st.success("✅ 已停用帳號")
                 else:
                     st.error("❌ 停用失敗")
 
         with col3:
             if st.button("🗑️ 刪除帳號"):
-                if delete_user(row["ID"]):
+                if delete_user(row.get("ID")):
                     st.success("✅ 已刪除帳號")
                 else:
                     st.error("❌ 刪除失敗")
     else:
         st.info("👈 請點選左邊 checkbox 選取要編輯的帳號")
-
 
     # 🖌️ CSS 美化
     st.markdown("""
