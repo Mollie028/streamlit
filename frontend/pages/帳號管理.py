@@ -119,3 +119,7 @@ if st.button("💾 儲存變更"):
         requests.put(f"{API_BASE_URL}/update_user/{user_id}", json=payload)
 
     st.success("✅ 帳號更新完成！請重新整理頁面查看最新狀態。")
+
+def run():
+    main()
+
