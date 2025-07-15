@@ -90,28 +90,49 @@ def main():
     selected_rows = grid_return["selected_rows"]
     edited_df = grid_return["data"]  # 中文欄位名的 DataFrame
 
-    if st.button("💾 儲存變更"):
-        for row in selected_rows:
-            user_id = row["使用者 ID"]  # ✅ 改為正確的欄位名
-            new_row = edited_df[edited_df["使用者 ID"] == user_id].iloc[0]
-            status = new_row["狀態"]
-    
-            # 執行狀態操作
-            if status == "啟用帳號":
-                requests.put(f"{API_BASE_URL}/enable_user/{user_id}")
-            elif status == "停用帳號":
-                requests.put(f"{API_BASE_URL}/disable_user/{user_id}")
-            elif status == "刪除帳號":
-                requests.delete(f"{API_BASE_URL}/delete_user/{user_id}")
-    
-            # 其餘欄位更新
-            payload = {
-                "is_admin": new_row["是否為管理員"],
-                "note": new_row["備註"] if pd.notna(new_row["備註"]) else ""
-            }
-            requests.put(f"{API_BASE_URL}/update_user/{user_id}", json=payload)
-    
-        st.success("✅ 帳號更新完成！請重新整理頁面查看最新狀態。")
+if st.button("💾 儲存變更"):
+    if not selected_rows:
+        st.warning("請先選取至少一筆帳號進行變更。")
+        st.stop()
+
+    for row in selected_rows:
+        # 🔍 除錯：先印出 row 看內容是什麼
+        st.write("👉 選取的 row：", row)
+
+        # ✅ 檢查 key 是否存在
+        if "使用者 ID" not in row:
+            st.error("錯誤：找不到『使用者 ID』欄位，請檢查表格欄位名稱。")
+            continue
+
+        user_id = row["使用者 ID"]
+
+        # 從編輯後的 dataframe 取出該筆資料
+        new_row = edited_df[edited_df["使用者 ID"] == user_id]
+        if new_row.empty:
+            st.warning(f"⚠️ 找不到 ID 為 {user_id} 的帳號，略過。")
+            continue
+
+        new_row = new_row.iloc[0]  # 取出第一列
+
+        status = new_row["狀態"]
+
+        # 狀態操作
+        if status == "啟用帳號":
+            requests.put(f"{API_BASE_URL}/enable_user/{user_id}")
+        elif status == "停用帳號":
+            requests.put(f"{API_BASE_URL}/disable_user/{user_id}")
+        elif status == "刪除帳號":
+            requests.delete(f"{API_BASE_URL}/delete_user/{user_id}")
+
+        # 其餘欄位更新
+        payload = {
+            "is_admin": new_row["是否為管理員"],
+            "note": new_row["備註"] if pd.notna(new_row["備註"]) else ""
+        }
+        requests.put(f"{API_BASE_URL}/update_user/{user_id}", json=payload)
+
+    st.success("✅ 帳號更新完成！請重新整理頁面查看最新狀態。")
+
 
 
 def run():
