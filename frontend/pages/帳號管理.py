@@ -1,99 +1,157 @@
 import streamlit as st
+import pandas as pd
 import requests
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-import pandas as pd
 
-# 讓用戶發現 secrets 未設定時的錯誤
-try:
-    "API_BASE = "https://ocr-whisper-production-2.up.railway.app"
-    
-except KeyError:
-    st.error("🚨 請至 Settings → Secrets 設定 API_BASE")
-    st.stop()
+API_URL = "https://ocr-whisper-production-2.up.railway.app"
 
-st.title("\U0001f5c3️ 帳號管理")
-
-# ---- 請求 API 取得帳號列表 ---- #
-@st.cache_data(show_spinner=False)
+# ---------------------------
+# API Functions
+# ---------------------------
 def get_users():
-    res = requests.get(f"{API_BASE}/users")
-    if res.status_code == 200:
-        return res.json()
-    else:
-        st.error("無法取得帳號資料")
-        return []
-
-users = get_users()
-df = pd.DataFrame(users)
-
-# 預設格式處理
-if 'enabled' in df.columns:
-    df["啟用中"] = df["enabled"]
-if 'role' in df.columns:
-    df["管理員"] = df["role"].apply(lambda x: x == 'admin')
-if 'note' not in df.columns:
-    df["note"] = ""
-
-# ---- AgGrid 主表格 ---- #
-st.markdown("### 帳號清單")
-
-gb = GridOptionsBuilder.from_dataframe(df[["id", "username", "管理員", "company", "啟用中", "note"]])
-gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
-gb.configure_column("id", header_name="ID", editable=False)
-gb.configure_column("username", header_name="帳號", editable=False)
-gb.configure_column("管理員", header_name="管理員", editable=True)
-gb.configure_column("company", header_name="公司", editable=False)
-gb.configure_column("啟用中", header_name="啟用中", editable=True)
-gb.configure_column("note", header_name="備註", editable=True)
-
-# 列選標記 + 允許編輯
-gb.configure_selection(selection_mode="multiple", use_checkbox=True)
-grid_options = gb.build()
-
-grid_response = AgGrid(
-    df,
-    gridOptions=grid_options,
-    update_mode=GridUpdateMode.MODEL_CHANGED,
-    fit_columns_on_grid_load=True,
-    allow_unsafe_jscode=True,
-    height=300
-)
-
-selected_rows = grid_response["selected_rows"]
-updated_df = grid_response["data"]
-
-# ---- 啟用 / 停用 / 刪除功能展示與啟用 ---- #
-st.markdown("### 設定帳號狀態")
-if selected_rows:
-    ids = [r["id"] for r in selected_rows]
-    for id_ in ids:
-        row = updated_df[updated_df["id"] == id_].iloc[0]
-        payload = {
-            "enabled": row["啟用中"],
-            "role": "admin" if row["管理員"] else "user",
-            "note": row["note"]
-        }
-        res = requests.put(f"{API_BASE}/update_user/{id_}", json=payload)
+    try:
+        res = requests.get(f"{API_URL}/users")
         if res.status_code == 200:
-            st.success(f"ID {id_} 資料更新成功")
-        else:
-            st.error(f"ID {id_} 更新失敗")
-else:
-    st.info("\U0001f50d 請選擇想編輯的帳號")
+            return res.json()
+    except Exception as e:
+        st.error(f"🚨 錯誤：{e}")
+    return []
 
-# ---- 修改密碼 ---- #
-st.markdown("### 修改密碼")
-if selected_rows and len(selected_rows) == 1:
-    user_id = selected_rows[0]["id"]
-    new_pw = st.text_input("請輸入新密碼", type="password")
-    if st.button("修改密碼"):
-        if new_pw:
-            res = requests.put(f"{API_BASE}/update_user_password/{user_id}", json={"new_password": new_pw})
-            if res.status_code == 200:
-                st.success("密碼修改成功")
+def update_user(user_id, data):
+    try:
+        res = requests.put(f"{API_URL}/update_user/{user_id}", json=data)
+        return res.status_code == 200
+    except Exception as e:
+        st.error(f"❌ 更新失敗：{e}")
+        return False
+
+def update_password(user_id, new_password):
+    try:
+        res = requests.put(
+            f"{API_URL}/update_user_password/{user_id}",
+            json={"password": new_password}
+        )
+        return res.status_code == 200
+    except Exception as e:
+        st.error(f"❌ 密碼更新失敗：{e}")
+        return False
+
+def delete_user(user_id):
+    try:
+        res = requests.delete(f"{API_URL}/delete_user/{user_id}")
+        return res.status_code == 200
+    except Exception as e:
+        st.error(f"❌ 刪除失敗：{e}")
+        return False
+
+# ---------------------------
+# 主畫面 UI
+# ---------------------------
+def main():
+    st.title("👤 帳號管理面板")
+
+    users = get_users()
+    if not users:
+        st.warning("⚠️ 尚無帳號資料")
+        return
+
+    df = pd.DataFrame(users)
+
+    df = df.rename(columns={
+        "id": "ID",
+        "username": "帳號",
+        "is_admin": "管理員",
+        "company_name": "公司",
+        "is_active": "啟用中",
+        "note": "備註",
+    })
+    df["備註"] = df["備註"].fillna("")
+    df["公司"] = df["公司"].fillna("")
+
+    # 🔍 搜尋
+    search = st.text_input("🔍 搜尋帳號／公司／備註")
+    if search:
+        df = df[df.apply(lambda row: search.lower() in str(row).lower(), axis=1)]
+
+    # 📤 匯出 CSV
+    csv = df.to_csv(index=False, encoding="utf-8-sig")
+    st.download_button("📤 匯出帳號清單 (CSV)", data=csv, file_name="帳號清單.csv", mime="text/csv")
+
+    # AgGrid 設定（表格顯示 5 筆）
+    gb = GridOptionsBuilder.from_dataframe(df)
+    gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
+    gb.configure_default_column(editable=False, resizable=True, wrapText=True, autoHeight=True)
+    gb.configure_column("備註", editable=True)
+    gb.configure_column("啟用中", editable=True)
+    gb.configure_column("管理員", editable=True)
+    gb.configure_selection("multiple", use_checkbox=True)
+
+    grid = AgGrid(
+        df,
+        gridOptions=gb.build(),
+        update_mode=GridUpdateMode.MODEL_CHANGED,
+        fit_columns_on_grid_load=True,
+        theme="streamlit",
+        height=380,
+    )
+
+    selected = grid.get("selected_rows", [])
+    updated_df = grid["data"]
+
+    # 📌 修改密碼（僅選取一筆時顯示）
+    if len(selected) == 1:
+        st.markdown("---")
+        st.subheader("🔐 修改密碼")
+        new_pw = st.text_input("請輸入新密碼", type="password", key="pw_input")
+        if st.button("🚀 修改密碼"):
+            if new_pw.strip() == "":
+                st.warning("請輸入新密碼")
             else:
-                st.error("API 失敗")
-        else:
-            st.warning("請輸入新密碼")
-else:
-    st.info("\U0001f512 請選擇一個帳號進行密碼修改")
+                if update_password(selected[0]["ID"], new_pw.strip()):
+                    st.success("✅ 密碼修改成功")
+                else:
+                    st.error("❌ 密碼修改失敗")
+
+    # 📌 操作按鈕區（緊接在表格或密碼區下）
+    st.markdown("---")
+    st.subheader("🛠️ 帳號操作")
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        if st.button("💾 儲存變更"):
+            if not selected:
+                st.warning("請選取要儲存的帳號")
+            else:
+                count = 0
+                for row in selected:
+                    user_id = row["ID"]
+                    payload = {
+                        "note": row["備註"],
+                        "is_active": row["啟用中"],
+                        "is_admin": row["管理員"],
+                    }
+                    if update_user(user_id, payload):
+                        count += 1
+                st.success(f"✅ 已更新 {count} 筆帳號")
+
+    with col2:
+        if st.button("🛑 停用帳號"):
+            if not selected:
+                st.warning("請選取要停用的帳號")
+            else:
+                for row in selected:
+                    update_user(row["ID"], {"is_active": False})
+                st.success("✅ 停用完成")
+
+    with col3:
+        if st.button("🗑️ 刪除帳號"):
+            if not selected:
+                st.warning("請選取要刪除的帳號")
+            else:
+                for row in selected:
+                    delete_user(row["ID"])
+                st.success("✅ 刪除完成")
+
+# 🌐 執行
+def run():
+    main()
