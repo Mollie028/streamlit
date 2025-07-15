@@ -92,7 +92,7 @@ def main():
 
     if st.button("💾 儲存變更"):
         for row in selected_rows:
-            user_id = row["使用者 ID"]
+            user_id = row["id"]  # ✅ 修正這一行：使用英文欄位 id
             new_row = edited_df[edited_df["使用者 ID"] == user_id].iloc[0]
             status = new_row["狀態"]
 
