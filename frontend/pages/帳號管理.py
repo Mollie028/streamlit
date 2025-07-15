@@ -26,6 +26,17 @@ def update_user(user_id, data):
         st.error(f"❌ 更新失敗：{e}")
         return False
 
+def update_password(user_id, new_password):
+    try:
+        res = requests.put(
+            f"{API_URL}/update_user_password/{user_id}",
+            json={"password": new_password}
+        )
+        return res.status_code == 200
+    except Exception as e:
+        st.error(f"❌ 密碼更新失敗：{e}")
+        return False
+
 def delete_user(user_id):
     try:
         res = requests.delete(f"{API_URL}/delete_user/{user_id}")
@@ -39,7 +50,7 @@ def delete_user(user_id):
 # ---------------------------
 def main():
     st.markdown("<h1 style='color:#2c3e50;'>👨‍💼 帳號管理面板</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='color:gray;'>可編輯帳號資料，點選一列後可儲存 / 停用 / 刪除</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:gray;'>可編輯帳號資料，點選一列後可儲存 / 停用 / 修改密碼 / 刪除</p>", unsafe_allow_html=True)
 
     users = get_users()
     if not users:
@@ -63,7 +74,7 @@ def main():
     if search:
         df = df[df.apply(lambda row: search.lower() in str(row).lower(), axis=1)]
 
-    # CSV 匯出
+    # 匯出 CSV
     csv_buffer = BytesIO()
     df.to_csv(csv_buffer, index=False, encoding="utf-8-sig")
     st.download_button(
@@ -73,9 +84,9 @@ def main():
         mime="text/csv",
     )
 
-    # 設定 AgGrid 表格
+    # AgGrid 設定
     gb = GridOptionsBuilder.from_dataframe(df)
-    gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
+    gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=10)
     gb.configure_default_column(editable=False, wrapText=True, autoHeight=True)
     gb.configure_column("備註", editable=True)
     gb.configure_column("啟用中", editable=True)
@@ -85,23 +96,20 @@ def main():
     grid = AgGrid(
         df,
         gridOptions=gb.build(),
-        update_mode=GridUpdateMode.SELECTION_CHANGED,  # ✅ 修正這裡
+        update_mode=GridUpdateMode.SELECTION_CHANGED,
         height=450,
         theme="streamlit",
     )
-    
+
     updated_df = grid["data"]
     selected = grid.get("selected_rows", [])
-    
-    # 🐛 除錯用：顯示實際抓到的 selected 結果
-    st.write("🔍 Debug - selected:", selected)
-    
+
     if isinstance(selected, list) and len(selected) > 0 and isinstance(selected[0], dict):
         row = selected[0]
-        st.info(f"✏️ 目前選取帳號：**{row.get('帳號', '未知')}**")
-    
+        st.info(f"✏️ 已選取帳號：**{row.get('帳號', '未知')}**")
+
         col1, col2, col3 = st.columns(3)
-    
+
         with col1:
             if st.button("💾 儲存變更"):
                 user_id = row.get("ID")
@@ -113,24 +121,36 @@ def main():
                 if update_user(user_id, payload):
                     st.success("✅ 資料已儲存")
                 else:
-                    st.error("❌ 儲存失敗，請稍後再試")
-    
+                    st.error("❌ 儲存失敗")
+
         with col2:
             if st.button("🛑 停用帳號"):
                 if update_user(row.get("ID"), {"active": False}):
-                    st.success("✅ 已停用帳號")
+                    st.success("✅ 帳號已停用")
                 else:
                     st.error("❌ 停用失敗")
-    
+
         with col3:
             if st.button("🗑️ 刪除帳號"):
                 if delete_user(row.get("ID")):
-                    st.success("✅ 已刪除帳號")
+                    st.success("✅ 帳號已刪除")
                 else:
                     st.error("❌ 刪除失敗")
+
+        # 🔐 修改密碼區塊
+        st.markdown("---")
+        st.subheader("🔐 修改密碼")
+        new_pw = st.text_input("請輸入新密碼", type="password", key="new_pw_input")
+        if st.button("🚀 修改密碼"):
+            if new_pw.strip() == "":
+                st.warning("請輸入新密碼")
+            else:
+                if update_password(row.get("ID"), new_pw.strip()):
+                    st.success("✅ 密碼已成功修改")
+                else:
+                    st.error("❌ 密碼修改失敗")
     else:
         st.info("👈 請點選左邊 checkbox 選取要編輯的帳號")
-
 
     # 🖌️ CSS 美化
     st.markdown("""
