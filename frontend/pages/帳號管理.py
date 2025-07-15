@@ -56,7 +56,6 @@ def main():
         return
 
     df = pd.DataFrame(users)
-
     df = df.rename(columns={
         "id": "ID",
         "username": "帳號",
@@ -67,18 +66,18 @@ def main():
     })
     df["備註"] = df["備註"].fillna("")
     df["公司"] = df["公司"].fillna("")
-    df["動作"] = "無操作"  # 新增欄位
+    df["動作"] = "無操作"
 
-    # 🔍 搜尋
     search = st.text_input("🔍 搜尋帳號／公司／備註")
     if search:
         df = df[df.apply(lambda row: search.lower() in str(row).lower(), axis=1)]
 
-    # 📤 匯出 CSV
     csv = df.to_csv(index=False, encoding="utf-8-sig")
     st.download_button("📤 匯出帳號清單 (CSV)", data=csv, file_name="帳號清單.csv", mime="text/csv")
 
-    # 👉 AgGrid 表格設定
+    # ======================
+    # 表格設定與顯示
+    # ======================
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
     gb.configure_default_column(editable=False, resizable=True, wrapText=True, autoHeight=True)
@@ -86,36 +85,34 @@ def main():
     gb.configure_column("啟用中", editable=True)
     gb.configure_column("管理員", editable=True)
 
-    # 設定下拉選單選項
-    action_options = ["無操作", "停用帳號", "刪除帳號"]
+    # 動作欄：設定為下拉選單
     gb.configure_column(
         "動作",
         editable=True,
         cellEditor="agSelectCellEditor",
-        cellEditorParams={"values": action_options},
+        cellEditorParams={"values": ["無操作", "停用帳號", "刪除帳號"]}
     )
 
     gb.configure_selection("multiple", use_checkbox=True)
 
-    with st.container():
-        st.markdown('<div style="max-width: 1000px;">', unsafe_allow_html=True)
+    st.markdown("### 👥 帳號清單")
+    grid = AgGrid(
+        df,
+        gridOptions=gb.build(),
+        update_mode=GridUpdateMode.MODEL_CHANGED,
+        fit_columns_on_grid_load=False,
+        theme="streamlit",
+        height=380,
+        allow_unsafe_jscode=True,
+    )
 
-        grid = AgGrid(
-            df,
-            gridOptions=gb.build(),
-            update_mode=GridUpdateMode.MODEL_CHANGED,
-            fit_columns_on_grid_load=True,
-            theme="streamlit",
-            height=380,
-        )
+    selected = grid.get("selected_rows", [])
+    updated_df = grid["data"]
 
-        selected = grid.get("selected_rows", [])
-        updated_df = grid["data"]
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    # 🔐 修改密碼區塊（只選取一筆帳號才出現）
-    if len(selected) == 1:
+    # ======================
+    # 修改密碼
+    # ======================
+    if selected and len(selected) == 1:
         st.markdown("---")
         st.subheader("🔐 修改密碼")
         new_pw = st.text_input("請輸入新密碼", type="password", key="pw_input")
@@ -128,33 +125,39 @@ def main():
                 else:
                     st.error("❌ 密碼修改失敗")
 
-    # 💾 儲存變更按鈕（如果有修改密碼，就放在下面）
+    # ======================
+    # 帳號操作按鈕（下移）
+    # ======================
     st.markdown("---")
-    st.subheader("🛠️ 儲存變更")
+    st.subheader("🛠️ 帳號操作")
+
     if st.button("💾 儲存變更"):
-        if not selected:
-            st.warning("請選取要儲存的帳號")
-        else:
-            count = 0
-            for row in selected:
+        if not updated_df.empty:
+            count_update, count_disable, count_delete = 0, 0, 0
+            for _, row in updated_df.iterrows():
                 user_id = row["ID"]
+                note = row["備註"]
+                is_active = row["啟用中"]
+                is_admin = row["管理員"]
+                action = row["動作"]
 
-                # 更新基本資料
+                # 一般更新
                 update_user(user_id, {
-                    "note": row["備註"],
-                    "is_active": row["啟用中"],
-                    "is_admin": row["管理員"],
+                    "note": note,
+                    "is_active": is_active,
+                    "is_admin": is_admin,
                 })
+                count_update += 1
 
-                # 執行動作
-                action = row.get("動作", "無操作")
+                # 動作處理
                 if action == "停用帳號":
                     update_user(user_id, {"is_active": False})
+                    count_disable += 1
                 elif action == "刪除帳號":
                     delete_user(user_id)
+                    count_delete += 1
 
-                count += 1
-            st.success(f"✅ 完成 {count} 筆帳號的更新與操作")
+            st.success(f"✅ 更新完成：{count_update} 筆更新，{count_disable} 筆停用，{count_delete} 筆刪除")
 
 # 🌐 執行
 def run():
