@@ -5,7 +5,8 @@ import pandas as pd
 
 # 讓用戶發現 secrets 未設定時的錯誤
 try:
-    API_BASE = st.secrets["API_BASE"]
+    "API_BASE = "https://ocr-whisper-production-2.up.railway.app"
+    
 except KeyError:
     st.error("🚨 請至 Settings → Secrets 設定 API_BASE")
     st.stop()
