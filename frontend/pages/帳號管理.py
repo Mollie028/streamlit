@@ -6,6 +6,7 @@ from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode
 API_BASE_URL = "https://ocr-whisper-production-2.up.railway.app"
 
 st.set_page_config(page_title="帳號管理", page_icon="👤", layout="wide")
+
 st.markdown("""
     <style>
     .ag-theme-streamlit .ag-root-wrapper {
@@ -39,87 +40,73 @@ def get_users():
         st.error("連線錯誤：" + str(e))
         return []
 
-def main():
-    users = get_users()
-    if not users:
-        st.stop()
+# 主邏輯
+users = get_users()
+if not users:
+    st.stop()
 
-    # 原始欄位名保留用於送出資料
-    for user in users:
-        user['is_admin'] = bool(user['is_admin'])
-        user['is_active'] = "啟用中" if user['is_active'] else "停用帳號"
+# 欄位處理
+for user in users:
+    user['is_admin'] = bool(user['is_admin'])
+    user['狀態操作'] = "無操作"
+    user['is_active_text'] = "啟用中" if user['is_active'] else "停用帳號"
 
-    df = pd.DataFrame(users)
+df = pd.DataFrame(users)
 
-    rename_columns = {
-        "id": "使用者 ID",
-        "username": "帳號名稱",
-        "is_admin": "是否為管理員",
-        "company_name": "公司名稱",
-        "is_active": "狀態",
-        "note": "備註"
-    }
+# 中文欄位對照
+rename_columns = {
+    "id": "使用者ID",
+    "username": "帳號名稱",
+    "is_admin": "是否為管理員",
+    "company_name": "公司名稱",
+    "note": "備註",
+    "is_active_text": "狀態"
+}
+df_display = df.rename(columns=rename_columns)
 
-    df_display = df.rename(columns=rename_columns)
+# 建立表格設定
+gb = GridOptionsBuilder.from_dataframe(df_display)
+gb.configure_selection("multiple", use_checkbox=True)
+gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
+gb.configure_default_column(editable=True, resizable=True)
 
-    gb = GridOptionsBuilder.from_dataframe(df_display)
-    gb.configure_selection("multiple", use_checkbox=True)
-    gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
-    gb.configure_default_column(editable=True, resizable=True)
+# 設定可編輯欄位
+gb.configure_column("備註", editable=True)
+gb.configure_column("是否為管理員", editable=True, cellEditor="agCheckboxCellEditor")
+gb.configure_column("狀態", editable=True, cellEditor="agSelectCellEditor",
+                    cellEditorParams={"values": ["啟用中", "停用帳號", "啟用帳號", "刪除帳號"]})
 
-    gb.configure_column("備註", editable=True)
-    gb.configure_column("是否為管理員", editable=True, cellEditor="agCheckboxCellEditor")
-    gb.configure_column("狀態", editable=True, cellEditor="agSelectCellEditor",
-                        cellEditorParams={"values": ["啟用中", "停用帳號", "啟用帳號", "刪除帳號"]})
+grid_return = AgGrid(
+    df_display,
+    gridOptions=gb.build(),
+    update_mode=GridUpdateMode.MODEL_CHANGED,
+    fit_columns_on_grid_load=True,
+    height=380,
+    theme="streamlit",
+    allow_unsafe_jscode=True
+)
 
-    grid_return = AgGrid(
-        df_display,
-        gridOptions=gb.build(),
-        update_mode=GridUpdateMode.MODEL_CHANGED,
-        fit_columns_on_grid_load=True,
-        height=380,
-        theme="streamlit",
-        allow_unsafe_jscode=True
-    )
+edited_df = grid_return["data"]
+selected_rows = grid_return["selected_rows"]
 
-    selected_rows = grid_return["selected_rows"]
-    edited_df = grid_return["data"]
+if st.button("💾 儲存變更"):
+    for row in selected_rows:
+        user_id = row["使用者ID"]
+        status = row["狀態"]
 
-    # ✅ 儲存變更按鈕補上來
-    if st.button("💾 儲存變更"):
-        if not selected_rows:
-            st.warning("請先選取至少一筆帳號進行變更。")
-            st.stop()
+        # 處理狀態欄位變更
+        if status == "啟用帳號":
+            requests.put(f"{API_BASE_URL}/enable_user/{user_id}")
+        elif status == "停用帳號":
+            requests.put(f"{API_BASE_URL}/disable_user/{user_id}")
+        elif status == "刪除帳號":
+            requests.delete(f"{API_BASE_URL}/delete_user/{user_id}")
 
-        for row in selected_rows:
-            try:
-                user_id = row["使用者 ID"]
-                new_row = edited_df[edited_df["使用者 ID"] == user_id]
-                if new_row.empty:
-                    st.warning(f"⚠️ 找不到 ID 為 {user_id} 的帳號，略過。")
-                    continue
+        # 更新其他欄位
+        payload = {
+            "is_admin": row["是否為管理員"],
+            "note": row["備註"] if pd.notna(row["備註"]) else ""
+        }
+        requests.put(f"{API_BASE_URL}/update_user/{user_id}", json=payload)
 
-                new_row = new_row.iloc[0]
-                status = new_row["狀態"]
-
-                # 狀態處理
-                if status == "啟用帳號":
-                    requests.put(f"{API_BASE_URL}/enable_user/{user_id}")
-                elif status == "停用帳號":
-                    requests.put(f"{API_BASE_URL}/disable_user/{user_id}")
-                elif status == "刪除帳號":
-                    requests.delete(f"{API_BASE_URL}/delete_user/{user_id}")
-
-                # 權限與備註更新
-                payload = {
-                    "is_admin": new_row["是否為管理員"],
-                    "note": new_row["備註"] if pd.notna(new_row["備註"]) else ""
-                }
-                requests.put(f"{API_BASE_URL}/update_user/{user_id}", json=payload)
-            except Exception as e:
-                st.error(f"❌ 無法更新帳號 ID {row.get('使用者 ID', '?')}：{str(e)}")
-
-        st.success("✅ 帳號更新完成！請重新整理頁面查看最新狀態。")
-
-def run():
-    main()
+    st.success("✅ 帳號更新完成！請重新整理頁面查看最新狀態。")
