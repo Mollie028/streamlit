@@ -85,20 +85,23 @@ def main():
     grid = AgGrid(
         df,
         gridOptions=gb.build(),
-        update_mode=GridUpdateMode.MODEL_CHANGED,
+        update_mode=GridUpdateMode.SELECTION_CHANGED,  # ✅ 修正這裡
         height=450,
         theme="streamlit",
     )
-
+    
     updated_df = grid["data"]
     selected = grid.get("selected_rows", [])
-
+    
+    # 🐛 除錯用：顯示實際抓到的 selected 結果
+    st.write("🔍 Debug - selected:", selected)
+    
     if isinstance(selected, list) and len(selected) > 0 and isinstance(selected[0], dict):
         row = selected[0]
         st.info(f"✏️ 目前選取帳號：**{row.get('帳號', '未知')}**")
-
+    
         col1, col2, col3 = st.columns(3)
-
+    
         with col1:
             if st.button("💾 儲存變更"):
                 user_id = row.get("ID")
@@ -111,14 +114,14 @@ def main():
                     st.success("✅ 資料已儲存")
                 else:
                     st.error("❌ 儲存失敗，請稍後再試")
-
+    
         with col2:
             if st.button("🛑 停用帳號"):
                 if update_user(row.get("ID"), {"active": False}):
                     st.success("✅ 已停用帳號")
                 else:
                     st.error("❌ 停用失敗")
-
+    
         with col3:
             if st.button("🗑️ 刪除帳號"):
                 if delete_user(row.get("ID")):
@@ -127,6 +130,7 @@ def main():
                     st.error("❌ 刪除失敗")
     else:
         st.info("👈 請點選左邊 checkbox 選取要編輯的帳號")
+
 
     # 🖌️ CSS 美化
     st.markdown("""
