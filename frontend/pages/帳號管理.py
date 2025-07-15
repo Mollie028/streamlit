@@ -92,10 +92,10 @@ def main():
 
     if st.button("💾 儲存變更"):
         for row in selected_rows:
-            user_id = row["id"]  # ✅ 修正這一行：使用英文欄位 id
+            user_id = row["使用者 ID"]  # ✅ 改為正確的欄位名
             new_row = edited_df[edited_df["使用者 ID"] == user_id].iloc[0]
             status = new_row["狀態"]
-
+    
             # 執行狀態操作
             if status == "啟用帳號":
                 requests.put(f"{API_BASE_URL}/enable_user/{user_id}")
@@ -103,15 +103,16 @@ def main():
                 requests.put(f"{API_BASE_URL}/disable_user/{user_id}")
             elif status == "刪除帳號":
                 requests.delete(f"{API_BASE_URL}/delete_user/{user_id}")
-
+    
             # 其餘欄位更新
             payload = {
                 "is_admin": new_row["是否為管理員"],
                 "note": new_row["備註"] if pd.notna(new_row["備註"]) else ""
             }
             requests.put(f"{API_BASE_URL}/update_user/{user_id}", json=payload)
-
+    
         st.success("✅ 帳號更新完成！請重新整理頁面查看最新狀態。")
+
 
 def run():
     main()
