@@ -50,7 +50,7 @@ def delete_user(user_id):
 # ---------------------------
 def main():
     st.markdown("<h1 style='color:#2c3e50;'>👨‍💼 帳號管理面板</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='color:gray;'>可編輯帳號資料，點選一列後可儲存 / 停用 / 修改密碼 / 刪除</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:gray;'>可編輯帳號資料，勾選一筆或多筆後可儲存 / 停用 / 修改密碼 / 刪除</p>", unsafe_allow_html=True)
 
     users = get_users()
     if not users:
@@ -91,12 +91,12 @@ def main():
     gb.configure_column("備註", editable=True)
     gb.configure_column("啟用中", editable=True)
     gb.configure_column("管理員", editable=True)
-    gb.configure_selection("single", use_checkbox=True)
+    gb.configure_selection("multiple", use_checkbox=True)  # ✅ 多筆選擇
 
     grid = AgGrid(
         df,
         gridOptions=gb.build(),
-        update_mode=GridUpdateMode.SELECTION_CHANGED,
+        update_mode=GridUpdateMode.MODEL_CHANGED,
         height=450,
         theme="streamlit",
     )
@@ -104,53 +104,64 @@ def main():
     updated_df = grid["data"]
     selected = grid.get("selected_rows", [])
 
-    if isinstance(selected, list) and len(selected) > 0 and isinstance(selected[0], dict):
-        row = selected[0]
-        st.info(f"✏️ 已選取帳號：**{row.get('帳號', '未知')}**")
+    if isinstance(selected, list) and len(selected) > 0:
+        selected_ids = [row.get("ID") for row in selected]
+        selected_usernames = [row.get("帳號", "") for row in selected]
+        st.info(f"✏️ 已選取帳號：{'、'.join(selected_usernames)}")
 
         col1, col2, col3 = st.columns(3)
 
         with col1:
             if st.button("💾 儲存變更"):
-                user_id = row.get("ID")
-                payload = {
-                    "note": row.get("備註", ""),
-                    "active": row.get("啟用中", False),
-                    "is_admin": row.get("管理員", False)
-                }
-                if update_user(user_id, payload):
-                    st.success("✅ 資料已儲存")
-                else:
-                    st.error("❌ 儲存失敗")
+                updated_count = 0
+                for row in selected:
+                    user_id = row.get("ID")
+                    payload = {
+                        "note": row.get("備註", ""),
+                        "active": row.get("啟用中", False),
+                        "is_admin": row.get("管理員", False)
+                    }
+                    if update_user(user_id, payload):
+                        updated_count += 1
+                st.success(f"✅ 已更新 {updated_count} 筆資料")
 
         with col2:
             if st.button("🛑 停用帳號"):
-                if update_user(row.get("ID"), {"active": False}):
-                    st.success("✅ 帳號已停用")
+                failed = []
+                for row in selected:
+                    if not update_user(row.get("ID"), {"active": False}):
+                        failed.append(row.get("帳號"))
+                if not failed:
+                    st.success("✅ 所選帳號已全部停用")
                 else:
-                    st.error("❌ 停用失敗")
+                    st.warning(f"⚠️ 以下帳號停用失敗：{', '.join(failed)}")
 
         with col3:
             if st.button("🗑️ 刪除帳號"):
-                if delete_user(row.get("ID")):
-                    st.success("✅ 帳號已刪除")
+                failed = []
+                for row in selected:
+                    if not delete_user(row.get("ID")):
+                        failed.append(row.get("帳號"))
+                if not failed:
+                    st.success("✅ 所選帳號已刪除")
                 else:
-                    st.error("❌ 刪除失敗")
+                    st.warning(f"⚠️ 以下帳號刪除失敗：{', '.join(failed)}")
 
-        # 🔐 修改密碼區塊
-        st.markdown("---")
-        st.subheader("🔐 修改密碼")
-        new_pw = st.text_input("請輸入新密碼", type="password", key="new_pw_input")
-        if st.button("🚀 修改密碼"):
-            if new_pw.strip() == "":
-                st.warning("請輸入新密碼")
-            else:
-                if update_password(row.get("ID"), new_pw.strip()):
-                    st.success("✅ 密碼已成功修改")
+        # 只有選到 1 筆時才允許修改密碼
+        if len(selected) == 1:
+            st.markdown("---")
+            st.subheader("🔐 修改密碼")
+            new_pw = st.text_input("請輸入新密碼", type="password", key="pw_input")
+            if st.button("🚀 修改密碼"):
+                if new_pw.strip() == "":
+                    st.warning("請輸入新密碼")
                 else:
-                    st.error("❌ 密碼修改失敗")
+                    if update_password(selected[0].get("ID"), new_pw.strip()):
+                        st.success("✅ 密碼已成功修改")
+                    else:
+                        st.error("❌ 密碼修改失敗")
     else:
-        st.info("👈 請點選左邊 checkbox 選取要編輯的帳號")
+        st.info("👈 請選擇至少一筆帳號進行操作")
 
     # 🖌️ CSS 美化
     st.markdown("""
