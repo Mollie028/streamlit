@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import requests
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
 API_URL = "https://ocr-whisper-production-2.up.railway.app"
 
@@ -66,7 +66,6 @@ def main():
     })
     df["備註"] = df["備註"].fillna("")
     df["公司"] = df["公司"].fillna("")
-    df["動作"] = "無操作"
 
     search = st.text_input("🔍 搜尋帳號／公司／備註")
     if search:
@@ -85,14 +84,6 @@ def main():
     gb.configure_column("啟用中", editable=True)
     gb.configure_column("管理員", editable=True)
 
-    # 動作欄：設定為下拉選單
-    gb.configure_column(
-        "動作",
-        editable=True,
-        cellEditor="agSelectCellEditor",
-        cellEditorParams={"values": ["無操作", "停用帳號", "刪除帳號"]}
-    )
-
     gb.configure_selection("multiple", use_checkbox=True)
 
     st.markdown("### 👥 帳號清單")
@@ -108,6 +99,18 @@ def main():
 
     selected = grid.get("selected_rows", [])
     updated_df = grid["data"]
+
+    # ======================
+    # 替換啟用欄為動作欄（如果選取）
+    # ======================
+    if selected:
+        selected_ids = [s["ID"] for s in selected]
+        for idx, row in updated_df.iterrows():
+            if row["ID"] in selected_ids:
+                if row["啟用中"]:
+                    updated_df.at[idx, "啟用中"] = "停用帳號"
+                else:
+                    updated_df.at[idx, "啟用中"] = "啟用帳號"
 
     # ======================
     # 修改密碼
@@ -133,32 +136,38 @@ def main():
 
     if st.button("💾 儲存變更"):
         if not updated_df.empty:
-            count_update, count_disable, count_delete = 0, 0, 0
+            count_update, count_disable, count_enable, count_delete = 0, 0, 0, 0
             for _, row in updated_df.iterrows():
                 user_id = row["ID"]
                 note = row["備註"]
-                is_active = row["啟用中"]
                 is_admin = row["管理員"]
-                action = row["動作"]
+                status = row["啟用中"]
 
-                # 一般更新
-                update_user(user_id, {
+                # 狀態處理邏輯
+                if status == True or status == "啟用帳號":
+                    is_active = True
+                elif status == "停用帳號":
+                    is_active = False
+                elif status == "刪除帳號":
+                    if delete_user(user_id):
+                        count_delete += 1
+                    continue
+                else:
+                    continue
+
+                # 更新帳號資訊
+                if update_user(user_id, {
                     "note": note,
                     "is_active": is_active,
                     "is_admin": is_admin,
-                })
-                count_update += 1
+                }):
+                    count_update += 1
+                    if not is_active:
+                        count_disable += 1
+                    else:
+                        count_enable += 1
 
-                # 動作處理
-                if action == "停用帳號":
-                    update_user(user_id, {"is_active": False})
-                    count_disable += 1
-                elif action == "刪除帳號":
-                    delete_user(user_id)
-                    count_delete += 1
+            st.success(f"✅ 完成：{count_update} 筆更新（啟用 {count_enable} 筆，停用 {count_disable} 筆），刪除 {count_delete} 筆")
 
-            st.success(f"✅ 更新完成：{count_update} 筆更新，{count_disable} 筆停用，{count_delete} 筆刪除")
-
-# 🌐 執行
 def run():
     main()
