@@ -2,10 +2,6 @@ import streamlit as st
 import requests
 from audio_recorder_streamlit import audio_recorder
 from core.config import API_BASE
-
-# ✅ 改這一行，把 frontend.pages 改成 pages（因為我們在 streamlit 裡執行）
-from frontend.pages import account_manager, add_card, card_list, change_password
-
 st.set_page_config(page_title="名片辨識系統", layout="centered")
 
 # 初始化狀態
@@ -124,18 +120,18 @@ elif st.session_state["current_page"] == "home":
 # 各功能頁面導向
 # ------------------------
 
-if st.session_state["current_page"] == "account_manage":
-    from frontend.pages import account_manager
-    account_manager.run()
+elif st.session_state["current_page"] == "account_manage":
+    import frontend.pages.account_manager as acc_page
+    acc_page.run()
 
 elif st.session_state["current_page"] == "add_card":
-    from frontend.pages import add_card
-    add_card.run()
+    import frontend.pages.add_card as add_page
+    add_page.run()
 
 elif st.session_state["current_page"] == "card_list":
-    from frontend.pages import card_list
-    card_list.run()
+    import frontend.pages.card_list as card_page
+    card_page.run()
 
 elif st.session_state["current_page"] == "change_password":
-    from frontend.pages import change_password
-    change_password.run()
+    import frontend.pages.change_password as change_page
+    change_page.run()
