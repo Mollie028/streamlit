@@ -2,7 +2,9 @@ import streamlit as st
 import requests
 from audio_recorder_streamlit import audio_recorder
 from core.config import API_BASE
-from frontend.pages import account_manager, add_card, card_list, change_password
+
+# ✅ 改這一行，把 frontend.pages 改成 pages（因為我們在 streamlit 裡執行）
+from pages import account_manager, add_card, card_list, change_password
 
 st.set_page_config(page_title="名片辨識系統", layout="centered")
 
@@ -37,7 +39,6 @@ if st.session_state["current_page"] == "login":
                 st.session_state["role"] = result.get("role", "user")
                 st.session_state["company_name"] = result.get("company_name", "")
                 
-                # ✅ 儲存登入使用者資訊
                 st.session_state["user_info"] = {
                     "id": result.get("id"),
                     "username": username,
@@ -122,7 +123,6 @@ elif st.session_state["current_page"] == "home":
 # ------------------------
 # 各功能頁面導向
 # ------------------------
-
 elif st.session_state["current_page"] == "account_manage":
     account_manager.run()
 
@@ -134,11 +134,3 @@ elif st.session_state["current_page"] == "card_list":
 
 elif st.session_state["current_page"] == "change_password":
     change_password.run()
-
-
-
-
-
-
-
-
