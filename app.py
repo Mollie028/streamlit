@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 from audio_recorder_streamlit import audio_recorder
 from core.config import API_BASE
+from frontend.pages import account_manager, add_card, card_list, change_password
 
 st.set_page_config(page_title="名片辨識系統", layout="centered")
 
@@ -123,20 +124,17 @@ elif st.session_state["current_page"] == "home":
 # ------------------------
 
 elif st.session_state["current_page"] == "account_manage":
-    from frontend.pages import account_manager
     account_manager.run()
 
 elif st.session_state["current_page"] == "add_card":
-    from frontend.pages import add_card
     add_card.run()
 
 elif st.session_state["current_page"] == "card_list":
-    from frontend.pages import card_list
     card_list.run()
 
 elif st.session_state["current_page"] == "change_password":
-    from frontend.pages import change_password
     change_password.run()
+
 
 
 
