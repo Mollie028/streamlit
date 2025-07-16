@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 from audio_recorder_streamlit import audio_recorder
 from core.config import API_BASE
+
 st.set_page_config(page_title="名片辨識系統", layout="centered")
 
 # 初始化狀態
