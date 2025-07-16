@@ -136,3 +136,4 @@ elif st.session_state["current_page"] == "card_list":
 elif st.session_state["current_page"] == "change_password":
     import frontend.pages.change_password as change_page
     change_page.run()
+
