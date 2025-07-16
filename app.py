@@ -4,7 +4,7 @@ from audio_recorder_streamlit import audio_recorder
 from core.config import API_BASE
 
 # ✅ 改這一行，把 frontend.pages 改成 pages（因為我們在 streamlit 裡執行）
-from pages import account_manager, add_card, card_list, change_password
+from frontend.pages import account_manager, add_card, card_list, change_password
 
 st.set_page_config(page_title="名片辨識系統", layout="centered")
 
