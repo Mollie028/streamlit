@@ -23,7 +23,7 @@ st.markdown("""
 
 st.markdown("## 👤 帳號清單")
 
-# 檢查登入者資訊
+# 檢查登入資訊
 if "user_info" not in st.session_state:
     st.error("⚠️ 請先登入帳號")
     st.stop()
@@ -32,6 +32,7 @@ current_user = st.session_state["user_info"]
 is_admin = current_user.get("is_admin", False)
 current_user_id = current_user.get("id")
 
+# 取得所有使用者
 @st.cache_data
 def get_users():
     try:
@@ -45,12 +46,11 @@ def get_users():
         st.error("❌ 連線錯誤：" + str(e))
         return []
 
-# 取得資料
 users = get_users()
 if not users:
     st.stop()
 
-# 前處理（加上中文欄位）
+# 整理顯示資料
 processed = []
 for user in users:
     uid = user.get("id")
@@ -62,8 +62,7 @@ for user in users:
         "是否為管理員": bool(user.get("is_admin", False)),
         "狀態": "啟用中" if user.get("is_active") else "停用帳號",
         "備註": user.get("note", ""),
-        "新密碼": "",
-        "可編輯": editable
+        "新密碼": "" if editable else "（無權限修改）"
     })
 
 df_display = pd.DataFrame(processed)[["使用者ID", "帳號名稱", "公司名稱", "是否為管理員", "狀態", "備註", "新密碼"]]
@@ -73,12 +72,11 @@ gb = GridOptionsBuilder.from_dataframe(df_display)
 gb.configure_selection("multiple", use_checkbox=True)
 gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
 
-editable_fields = ["是否為管理員", "狀態", "備註", "新密碼"]
-for col in editable_fields:
-    gb.configure_column(col, editable=True)
-gb.configure_column("是否為管理員", cellEditor="agCheckboxCellEditor")
-gb.configure_column("狀態", cellEditor="agSelectCellEditor",
+gb.configure_column("是否為管理員", editable=True, cellEditor="agCheckboxCellEditor")
+gb.configure_column("狀態", editable=True, cellEditor="agSelectCellEditor",
                     cellEditorParams={"values": ["啟用中", "停用帳號", "啟用帳號", "刪除帳號"]})
+gb.configure_column("備註", editable=True)
+gb.configure_column("新密碼", editable=True, cellEditor="agLargeTextCellEditor")
 
 grid_return = AgGrid(
     df_display,
@@ -98,12 +96,13 @@ if st.button("💾 儲存變更"):
     if not selected_rows:
         st.warning("⚠️ 請至少勾選一筆帳號")
     else:
+        success_count = 0
         for row in selected_rows:
             user_id = row.get("使用者ID")
             if not (is_admin or user_id == current_user_id):
-                continue  # 無權限編輯他人
+                continue  # 無權限
 
-            # 狀態處理
+            # 處理狀態
             status = row.get("狀態")
             if status == "啟用帳號":
                 requests.put(f"{API_BASE_URL}/enable_user/{user_id}")
@@ -112,20 +111,22 @@ if st.button("💾 儲存變更"):
             elif status == "刪除帳號":
                 requests.delete(f"{API_BASE_URL}/delete_user/{user_id}")
 
-            # 內容更新
+            # 更新備註、是否為管理員
             payload = {
                 "is_admin": row.get("是否為管理員", False),
                 "note": row.get("備註", "")
             }
             requests.put(f"{API_BASE_URL}/update_user/{user_id}", json=payload)
 
-            # 密碼更新
+            # 若有新密碼，則更新
             new_password = row.get("新密碼", "").strip()
-            if new_password:
+            if new_password and "無權限" not in new_password:
                 requests.put(f"{API_BASE_URL}/update_user_password/{user_id}", json={"password": new_password})
 
-        st.success("✅ 變更已完成，請重新整理查看最新結果")
+            success_count += 1
 
-# 返回按鈕
+        st.success(f"✅ 已成功儲存 {success_count} 筆帳號變更")
+
+# 返回主頁
 if st.button("🔙 返回主頁"):
-    st.switch_page("app.py")  # ⬅️ 改成你的主頁路徑即可
+    st.switch_page("app.py")  # ← 請改為你的主頁檔名路徑
