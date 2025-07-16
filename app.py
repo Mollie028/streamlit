@@ -121,21 +121,25 @@ elif st.session_state["current_page"] == "home":
 # ------------------------
 # 各功能頁面導向
 # ------------------------
+# ------------------------
+# 各功能頁面導向
+# ------------------------
 elif st.session_state["current_page"] == "account_manage":
-    import frontend.pages.account_manager as acc_page
-    acc_page.run()
+    from frontend.pages.account_manager import run as acc_page_run
+    acc_page_run()
 
 elif st.session_state["current_page"] == "add_card":
-    import frontend.pages.add_card as add_page
-    add_page.run()
+    from frontend.pages.add_card import run as add_page_run
+    add_page_run()
 
 elif st.session_state["current_page"] == "card_list":
-    import frontend.pages.card_list as card_page
-    card_page.run()
+    from frontend.pages.card_list import run as card_page_run
+    card_page_run()
 
 elif st.session_state["current_page"] == "change_password":
-    import frontend.pages.change_password as change_page
-    change_page.run()
+    from frontend.pages.change_password import run as change_page_run
+    change_page_run()
+
 
 
 
