@@ -92,8 +92,9 @@ def run():
 
     # 儲存變更
     if st.button("💾 儲存變更"):
-        if not selected_rows:
-            st.warning("⚠️ 請至少勾選一筆帳號")
+    if selected_rows.empty:
+        st.warning("⚠️ 請至少勾選一筆帳號")
+
         else:
             success_count = 0
             for row in selected_rows:
