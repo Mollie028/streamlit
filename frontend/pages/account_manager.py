@@ -51,21 +51,29 @@ def run():
     if not users:
         st.stop()
 
-    # 整理顯示資料（移除新密碼欄）
+    # 整理顯示資料（移除新密碼欄，加入狀態選項）
     processed = []
     for user in users:
         uid = user.get("id")
-        editable = is_admin or uid == current_user_id
+        is_active = user.get("is_active", True)
+        current_status = "啟用中" if is_active else "停用帳號"
+
+        if current_status == "啟用中":
+            status_options = ["停用帳號", "刪除帳號"]
+        else:
+            status_options = ["啟用帳號", "刪除帳號"]
+
         processed.append({
             "使用者ID": uid,
             "帳號名稱": user.get("username"),
             "公司名稱": user.get("company_name", ""),
             "是否為管理員": bool(user.get("is_admin", False)),
-            "狀態": "啟用中" if user.get("is_active") else "停用帳號",
+            "狀態": current_status,
+            "狀態選項": status_options,
             "備註": user.get("note", "")
         })
 
-    df_display = pd.DataFrame(processed)[["使用者ID", "帳號名稱", "公司名稱", "是否為管理員", "狀態", "備註"]]
+    df_display = pd.DataFrame(processed)[["使用者ID", "帳號名稱", "公司名稱", "是否為管理員", "狀態", "狀態選項", "備註"]]
 
     # AgGrid 設定
     gb = GridOptionsBuilder.from_dataframe(df_display)
@@ -73,8 +81,12 @@ def run():
     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
 
     gb.configure_column("是否為管理員", editable=True, cellEditor="agCheckboxCellEditor")
-    gb.configure_column("狀態", editable=True, cellEditor="agSelectCellEditor",
-                        cellEditorParams={"values": ["啟用中", "停用帳號", "啟用帳號", "刪除帳號"]})
+    gb.configure_column(
+        "狀態",
+        editable=True,
+        cellEditor="agSelectCellEditor",
+        cellEditorParams={"values": {"function": "params.data['狀態選項']"}}
+    )
     gb.configure_column("備註", editable=True)
 
     grid_return = AgGrid(
@@ -92,7 +104,7 @@ def run():
 
     # 儲存變更
     if st.button("💾 儲存變更"):
-        if not selected_rows:
+        if len(selected_rows) == 0:
             st.warning("⚠️ 請至少勾選一筆帳號")
         else:
             success_count = 0
