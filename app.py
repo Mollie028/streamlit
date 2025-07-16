@@ -35,6 +35,14 @@ if st.session_state["current_page"] == "login":
                 st.session_state["username"] = username
                 st.session_state["role"] = result.get("role", "user")
                 st.session_state["company_name"] = result.get("company_name", "")
+                
+                # ✅ 儲存登入使用者資訊
+                st.session_state["user_info"] = {
+                    "id": result.get("id"),
+                    "username": username,
+                    "is_admin": result.get("role", "user") == "admin"
+                }
+
                 st.session_state["current_page"] = "home"
                 st.rerun()
             else:
