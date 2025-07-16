@@ -51,7 +51,7 @@ def run():
     if not users:
         st.stop()
 
-    # 整理顯示資料（移除新密碼欄，加入狀態選項）
+    # 整理顯示資料
     processed = []
     for user in users:
         uid = user.get("id")
@@ -69,11 +69,11 @@ def run():
             "公司名稱": user.get("company_name", ""),
             "是否為管理員": bool(user.get("is_admin", False)),
             "狀態": current_status,
-            "狀態選項": status_options,
+            "狀態選項": status_options,  # 給 AgGrid 動態選項用，但稍後不顯示
             "備註": user.get("note", "")
         })
 
-    df_display = pd.DataFrame(processed)[["使用者ID", "帳號名稱", "公司名稱", "是否為管理員", "狀態", "狀態選項", "備註"]]
+    df_display = pd.DataFrame(processed)
 
     # AgGrid 設定
     gb = GridOptionsBuilder.from_dataframe(df_display)
@@ -81,13 +81,10 @@ def run():
     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
 
     gb.configure_column("是否為管理員", editable=True, cellEditor="agCheckboxCellEditor")
-    gb.configure_column(
-        "狀態",
-        editable=True,
-        cellEditor="agSelectCellEditor",
-        cellEditorParams={"values": {"function": "params.data['狀態選項']"}}
-    )
+    gb.configure_column("狀態", editable=True, cellEditor="agSelectCellEditor",
+                        cellEditorParams={"values": {"function": "params.data['狀態選項']"}})
     gb.configure_column("備註", editable=True)
+    gb.configure_column("狀態選項", hide=True)  # ✅ 不顯示該欄
 
     grid_return = AgGrid(
         df_display,
@@ -133,6 +130,7 @@ def run():
 
             st.success(f"✅ 已成功儲存 {success_count} 筆帳號變更")
 
-    # 返回主頁
+    # ✅ 返回主頁
     if st.button("🔙 返回主頁"):
-        st.switch_page("app.py")
+        st.session_state["current_page"] = "home"
+        st.rerun()
