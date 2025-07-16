@@ -41,7 +41,6 @@ def main():
     if not users:
         st.stop()
 
-    # 顯示用欄位處理
     for user in users:
         user["是否為管理員"] = bool(user["is_admin"])
         user["帳號名稱"] = user["username"]
@@ -49,11 +48,9 @@ def main():
         user["備註"] = user["note"]
         user["狀態"] = "啟用中" if user["is_active"] else "停用帳號"
 
-    # 顯示的表格欄位
     df_display = pd.DataFrame(users)[["id", "帳號名稱", "公司名稱", "是否為管理員", "狀態", "備註"]]
     df_display = df_display.rename(columns={"id": "使用者ID"})
 
-    # AgGrid 設定
     gb = GridOptionsBuilder.from_dataframe(df_display)
     gb.configure_selection("multiple", use_checkbox=True)
     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
@@ -75,14 +72,20 @@ def main():
     selected_rows = grid_return["selected_rows"]
     edited_df = grid_return["data"]
 
+    # 返回按鈕
+    if st.button("🔙 返回首頁"):
+        st.switch_page("/app.py")
+
     # 儲存變更按鈕
     if st.button("💾 儲存變更"):
-        if not selected_rows:
+        if selected_rows is None or len(selected_rows) == 0:
             st.warning("請先勾選至少一筆使用者資料。")
             return
 
         for row in selected_rows:
-            user_id = row.get("使用者ID")  # 對應欄位已重新命名
+            user_id = row.get("使用者ID")
+            if not user_id:
+                continue
             status = row.get("狀態", "")
 
             # 呼叫狀態 API
@@ -102,6 +105,5 @@ def main():
 
         st.success("✅ 帳號更新完成！請重新整理頁面查看最新狀態。")
 
-# 給 app.py 用的 run()
 def run():
     main()
