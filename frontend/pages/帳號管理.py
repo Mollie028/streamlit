@@ -36,24 +36,22 @@ def get_users():
         st.error("❌ 連線錯誤：" + str(e))
         return []
 
-# ✅ 主邏輯包進 main()
 def main():
-    # 取得資料
     users = get_users()
     if not users:
         st.stop()
 
-    # 前處理
+    # 顯示用欄位處理
     for user in users:
         user["是否為管理員"] = bool(user["is_admin"])
         user["帳號名稱"] = user["username"]
         user["公司名稱"] = user["company_name"]
         user["備註"] = user["note"]
         user["狀態"] = "啟用中" if user["is_active"] else "停用帳號"
-        user["使用者ID"] = user["id"]
 
-    # 轉成表格
-    df_display = pd.DataFrame(users)[["使用者ID", "帳號名稱", "公司名稱", "是否為管理員", "狀態", "備註"]]
+    # 顯示的表格欄位
+    df_display = pd.DataFrame(users)[["id", "帳號名稱", "公司名稱", "是否為管理員", "狀態", "備註"]]
+    df_display = df_display.rename(columns={"id": "使用者ID"})
 
     # AgGrid 設定
     gb = GridOptionsBuilder.from_dataframe(df_display)
@@ -79,9 +77,13 @@ def main():
 
     # 儲存變更按鈕
     if st.button("💾 儲存變更"):
+        if not selected_rows:
+            st.warning("請先勾選至少一筆使用者資料。")
+            return
+
         for row in selected_rows:
-            user_id = row["使用者ID"]
-            status = row["狀態"]
+            user_id = row.get("使用者ID")  # 對應欄位已重新命名
+            status = row.get("狀態", "")
 
             # 呼叫狀態 API
             if status == "啟用帳號":
@@ -93,13 +95,13 @@ def main():
 
             # 其他欄位更新
             payload = {
-                "is_admin": row["是否為管理員"],
-                "note": row["備註"] if pd.notna(row["備註"]) else ""
+                "is_admin": row.get("是否為管理員", False),
+                "note": row.get("備註", "") or ""
             }
             requests.put(f"{API_BASE_URL}/update_user/{user_id}", json=payload)
 
         st.success("✅ 帳號更新完成！請重新整理頁面查看最新狀態。")
 
-# ✅ 加上 run()
+# 給 app.py 用的 run()
 def run():
     main()
