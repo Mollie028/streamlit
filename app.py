@@ -122,7 +122,7 @@ elif st.session_state["current_page"] == "home":
 # 各功能頁面導向
 # ------------------------
 elif st.session_state["current_page"] == "account_manage":
-    import frontend.pages.帳號管理 as acc_page
+    import frontend.pages.account_manager as acc_page
     acc_page.run()
 
 elif st.session_state["current_page"] == "add_card":
