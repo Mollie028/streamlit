@@ -1,28 +1,28 @@
 import streamlit as st
-from st_aggrid import AgGrid, GridOptionsBuilder
-import requests
 import pandas as pd
+import requests
+from st_aggrid import AgGrid, GridOptionsBuilder
 
 def run():
-    st.title("👤 帳號管理")
+    st.title("👥 帳號管理")
 
-    # 👉 取得目前登入者的資訊
+    # 🔐 取得目前使用者資訊
     current_user = st.session_state.get("username", "")
     is_admin = st.session_state.get("is_admin", False)
 
-    # 👉 取得使用者清單
+    # ✅ 取得使用者清單
     api_url = "https://ocr-whisper-production-2.up.railway.app/users"
-    response = requests.get(api_url)
-    if response.status_code != 200:
-        st.error("❌ 無法取得使用者資料")
+    res = requests.get(api_url)
+    if res.status_code != 200:
+        st.error("❌ 無法載入帳號清單")
         return
-    users = response.json()
 
+    users = res.json()
     if not users:
-        st.warning("⚠️ 目前尚無帳號資料")
+        st.warning("⚠️ 尚無帳號資料")
         return
 
-    # 👉 建立 DataFrame
+    # 🧾 整理表格資料
     data = []
     for u in users:
         data.append({
@@ -34,21 +34,26 @@ def run():
         })
     df = pd.DataFrame(data)
 
-    # 👉 關鍵字搜尋
-    keyword = st.text_input("🔍 搜尋使用者 ID 或帳號名稱", "")
+    # 🔍 關鍵字搜尋
+    keyword = st.text_input("🔎 搜尋使用者 ID 或帳號名稱", "")
     if keyword:
-        df = df[df["帳號名稱"].str.contains(keyword, case=False) | df["使用者ID"].astype(str).str.contains(keyword)]
+        df = df[df["帳號名稱"].str.contains(keyword, case=False) |
+                df["使用者ID"].astype(str).str.contains(keyword)]
 
     if df.empty:
         st.warning("查無符合條件的使用者")
         return
 
-    # 👉 顯示 AgGrid 表格
-    st.subheader("📋 使用者清單")
+    # 📋 顯示表格（AgGrid）
+    st.subheader("📄 使用者清單")
     gb = GridOptionsBuilder.from_dataframe(df)
-    gb.configure_selection("multiple", use_checkbox=True)
-    for col in ["啟用狀態", "是否為管理員", "帳號名稱", "使用者ID"]:
-        gb.configure_column(col, editable=False)
+    gb.configure_selection(selection_mode="multiple", use_checkbox=True)
+    gb.configure_grid_options(domLayout='normal')
+    gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
+    # 設定欄位寬度平均
+    for col in df.columns:
+        gb.configure_column(col, width=150)
+
     grid_options = gb.build()
 
     grid_response = AgGrid(
@@ -60,59 +65,41 @@ def run():
     )
 
     selected_rows = grid_response["selected_rows"]
-    if not selected_rows:
-        st.info("請勾選欲操作的使用者")
+    if selected_rows is None or len(selected_rows) == 0:
+        st.info("✅ 請勾選一筆以上帳號後進行操作")
         return
 
-    st.subheader("🔧 帳號操作")
+    # 🧑‍⚖️ 權限檢查（非管理員不可操作他人）
+    for row in selected_rows:
+        if not is_admin and row["帳號名稱"] != current_user:
+            st.error("❌ 僅限管理員操作他人帳號")
+            return
 
-    # 👉 顯示選取帳號資訊
-    selected_df = pd.DataFrame(selected_rows)
-    st.dataframe(selected_df[["使用者ID", "帳號名稱", "啟用狀態"]], use_container_width=True)
+    st.divider()
+    st.subheader("🛠️ 批次操作")
 
-    # 👉 檢查權限（非管理員只能編輯自己）
-    invalid = False
-    if not is_admin:
-        for _, row in selected_df.iterrows():
-            if row["帳號名稱"] != current_user:
-                invalid = True
-                break
-    if invalid:
-        st.error("❌ 僅限管理員可操作他人帳號")
-        return
+    action = st.selectbox("請選擇操作項目", ["啟用帳號", "停用帳號", "刪除帳號"])
 
-    # 👉 批次操作選單
-    actions = []
-    for _, row in selected_df.iterrows():
-        if row["啟用狀態"] == "啟用中":
-            actions.append("停用帳號")
-        else:
-            actions.append("啟用帳號")
-    actions.append("刪除帳號")
-
-    action = st.selectbox("請選擇操作類型", list(set(actions)))
-
-    if st.button("✅ 執行操作"):
+    if st.button("🚀 執行操作"):
         success, fail = 0, 0
-        for _, row in selected_df.iterrows():
+        for row in selected_rows:
             uid = row["使用者ID"]
             if action == "啟用帳號":
-                res = requests.post(f"{api_url}/enable_user/{uid}")
+                resp = requests.post(f"{api_url}/enable_user/{uid}")
             elif action == "停用帳號":
-                res = requests.post(f"{api_url}/disable_user/{uid}")
+                resp = requests.post(f"{api_url}/disable_user/{uid}")
             elif action == "刪除帳號":
-                res = requests.delete(f"{api_url}/delete_user/{uid}")
+                resp = requests.delete(f"{api_url}/delete_user/{uid}")
             else:
-                res = None
+                continue
 
-            if res and res.status_code == 200:
+            if resp.status_code == 200:
                 success += 1
             else:
                 fail += 1
 
         if success:
-            st.success(f"✅ {action} 成功：{success} 位使用者")
+            st.success(f"✅ 成功 {success} 筆")
         if fail:
-            st.error(f"❌ {action} 失敗：{fail} 位使用者")
-
+            st.error(f"❌ 失敗 {fail} 筆")
         st.experimental_rerun()
