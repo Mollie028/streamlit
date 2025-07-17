@@ -6,10 +6,10 @@ from streamlit_extras.stylable_container import stylable_container
 
 API_URL = "https://ocr-whisper-production-2.up.railway.app"
 
-st.set_page_config(page_title="帳號清單", page_icon="👩‍💼", layout="wide")
-st.markdown("## 👩‍💼 帳號清單")
+st.set_page_config(page_title="帳號清單", page_icon="👩‍🏢", layout="wide")
+st.markdown("## 👩‍🏢 帳號清單")
 
-# 🧩 限管理員才能進入
+# 🧹 限管理員才能進入
 current_user = st.session_state.get("user_info", {})
 if not current_user.get("is_admin", False):
     st.warning("此頁面僅限管理員使用")
@@ -57,7 +57,7 @@ gb = GridOptionsBuilder.from_dataframe(df)
 gb.configure_column("是否為管理員", editable=True, cellEditor="agCheckboxCellEditor")
 gb.configure_column("備註", editable=True)
 
-# ✅ 下拉選單：依每列顯示對應選項
+# ⬆️ 加入動態下拉選單
 cell_editor_params = JsCode("""
 function(params) {
     return {
@@ -65,6 +65,7 @@ function(params) {
     }
 }
 """)
+
 gb.configure_column("狀態", editable=True, cellEditor="agSelectCellEditor", cellEditorParams=cell_editor_params)
 gb.configure_column("狀態選項", hide=True)
 
@@ -79,9 +80,13 @@ grid_response = AgGrid(
     allow_unsafe_jscode=True
 )
 
+# 📄 取出更新資料
 updated_rows = grid_response["data"].to_dict("records")
+for row in updated_rows:
+    if "狀態選項" not in row or not isinstance(row["狀態選項"], list):
+        row["狀態選項"] = ["啟用帳號", "停用帳號", "刪除帳號"]
 
-# 💾 儲存變更
+# 📅 儲存更動
 with stylable_container("save", css_styles="margin-top: 20px"):
     if st.button("📄 儲存變更"):
         success_count = 0
@@ -91,17 +96,22 @@ with stylable_container("save", css_styles="margin-top: 20px"):
             note = row.get("備註", "")
             status_text = row.get("狀態")
 
-            if status_text == "刪除帳號":
-                requests.delete(f"{API_URL}/delete_user/{uid}")
-            elif status_text == "停用帳號":
-                requests.put(f"{API_URL}/disable_user/{uid}")
-            elif status_text == "啟用帳號":
-                requests.put(f"{API_URL}/enable_user/{uid}")
-            else:
+            try:
+                if status_text == "刪除帳號":
+                    requests.delete(f"{API_URL}/delete_user/{uid}")
+                elif status_text == "停用帳號":
+                    requests.put(f"{API_URL}/disable_user/{uid}")
+                elif status_text == "啟用帳號":
+                    requests.put(f"{API_URL}/enable_user/{uid}")
+
+                # 如果有備註或 admin 變更
                 payload = {"is_admin": is_admin, "note": note}
                 requests.put(f"{API_URL}/update_user/{uid}", json=payload)
 
-            success_count += 1
+                success_count += 1
+
+            except Exception as e:
+                st.error(f"❌ 更新使用者 {uid} 時發生錯誤：{e}")
 
         st.success(f"✅ 已成功儲存 {success_count} 筆資料變更")
         st.rerun()
