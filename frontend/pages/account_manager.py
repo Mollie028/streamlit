@@ -56,7 +56,7 @@ if df.empty:
 gb = GridOptionsBuilder.from_dataframe(df)
 gb.configure_column("是否為管理員", editable=True, cellEditor="agCheckboxCellEditor")
 gb.configure_column("備註", editable=True)
-gb.configure_column("狀態", editable=True, cellEditor="agSelectCellEditor", cellEditorParams={"values": df["狀態選項"].iloc[0]})
+gb.configure_column("狀態", editable=True)  # ✅ 修正這裡
 gb.configure_column("狀態選項", hide=True)
 
 # 📋 顯示表格
@@ -103,6 +103,6 @@ with stylable_container("back", css_styles="margin-top: 10px"):
         st.session_state["current_page"] = "home"
         st.rerun()
 
-# ✅ run() 函數支援 app.py 呼叫
+# ✅ run() 函式支援 app.py 呼叫（修正 crash 問題）
 def run():
-    st.experimental_rerun()
+    pass
