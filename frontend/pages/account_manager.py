@@ -1,5 +1,5 @@
 import streamlit as st
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 import requests
 import pandas as pd
 
@@ -8,16 +8,17 @@ API_URL = "https://ocr-whisper-production-2.up.railway.app"
 def run():
     st.title("👤 帳號管理")
 
-    # ✅ 檢查登入狀態
-    if "username" not in st.session_state or "user_id" not in st.session_state:
+    # ✅ 安全檢查登入狀態（避免寫死）
+    login_info = st.session_state.get("user_info", {})
+    if not login_info or "username" not in login_info or "user_id" not in login_info:
         st.error("⚠️ 請先登入")
         return
 
-    login_username = st.session_state["username"]
-    login_userid = st.session_state["user_id"]
-    is_admin = st.session_state.get("is_admin", False)
+    login_username = login_info["username"]
+    login_userid = login_info["user_id"]
+    is_admin = login_info.get("is_admin", False)
 
-    # ✅ 取得使用者列表
+    # ✅ 取得所有使用者資料
     res = requests.get(f"{API_URL}/users")
     if res.status_code != 200:
         st.error("❌ 無法取得使用者資料")
@@ -28,7 +29,7 @@ def run():
         st.warning("⚠️ 尚無帳號資料")
         return
 
-    # ✅ 整理為 DataFrame
+    # ✅ 整理成 DataFrame
     df = pd.DataFrame([{
         "使用者ID": u["id"],
         "帳號名稱": u["username"],
@@ -40,7 +41,6 @@ def run():
     st.subheader("📋 使用者清單")
     gb = GridOptionsBuilder.from_dataframe(df)
 
-    # ✅ 欄位設定
     gb.configure_column("使用者ID", editable=False)
     gb.configure_column("帳號名稱", editable=False)
     gb.configure_column("是否為管理員", editable=is_admin, cellEditor="agSelectCellEditor", cellEditorParams={"values": [True, False]})
@@ -62,19 +62,13 @@ def run():
     updated_df = grid_response["data"]
     selected = grid_response["selected_rows"]
 
-    # ✅ 儲存變更按鈕
+    # ✅ 批次儲存變更
     if is_admin:
         st.markdown("### 💾 批次儲存修改")
         if st.button("✅ 儲存變更"):
             success = True
             for row in selected:
                 uid = row["使用者ID"]
-                # 限制非管理員不能編輯他人帳號
-                if not is_admin and uid != login_userid:
-                    st.warning(f"⛔ 無權限修改使用者 ID：{uid}")
-                    continue
-
-                # 找出修改後的資料列
                 new_row = updated_df[updated_df["使用者ID"] == uid].iloc[0]
                 payload = {
                     "is_admin": new_row["是否為管理員"],
@@ -87,6 +81,5 @@ def run():
                     success = False
             if success:
                 st.success("✅ 所有變更已成功儲存，請重新整理頁面")
-
     else:
         st.info("🔒 一般使用者僅能檢視，無法進行編輯")
