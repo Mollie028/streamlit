@@ -58,7 +58,7 @@ with col1:
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_selection("single", use_checkbox=True)
     gb.configure_column("是否為管理員", editable=False)
-    gb.configure_column("啟用狀態", hide=True)
+    gb.configure_column("啟用狀態", editable=False)  # 不隱藏，確保 selected_rows 包含這欄
     grid_response = AgGrid(
         df,
         gridOptions=gb.build(),
@@ -76,37 +76,48 @@ with col2:
     if not selected_rows:
         st.info("請點選左側帳號以進行操作")
     else:
-        selected = selected_rows[0]
-        user_id = selected["使用者ID"]
-        username = selected["帳號名稱"]
-        is_active = selected["啟用狀態"]
+        try:
+            selected = selected_rows[0]
+            st.write("✅ 選取列資料：", selected)  # 可關閉：debug用
 
-        st.markdown(f"**帳號 ID：** `{user_id}`")
-        st.markdown(f"**帳號名稱：** `{username}`")
-        st.markdown(f"**目前狀態：** `{'啟用中' if is_active else '已停用'}`")
+            user_id = selected.get("使用者ID")
+            username = selected.get("帳號名稱")
+            is_active = selected.get("啟用狀態", False)
+            if isinstance(is_active, str):
+                is_active = is_active.lower() == "true"
 
-        actions = []
-        if is_active:
-            actions = ["停用帳號", "刪除帳號"]
-        else:
-            actions = ["啟用帳號", "刪除帳號"]
+            if not user_id or not username:
+                st.warning("⚠️ 無法讀取選取帳號的完整資訊")
+            else:
+                st.markdown(f"**帳號 ID：** `{user_id}`")
+                st.markdown(f"**帳號名稱：** `{username}`")
+                st.markdown(f"**目前狀態：** `{'啟用中' if is_active else '已停用'}`")
 
-        action = st.radio("選擇操作動作：", actions, horizontal=True)
+                actions = ["刪除帳號"]
+                if is_active:
+                    actions.insert(0, "停用帳號")
+                else:
+                    actions.insert(0, "啟用帳號")
 
-        if st.button("✅ 執行操作"):
-            try:
-                if action == "啟用帳號":
-                    requests.put(f"{API_URL}/enable_user/{user_id}")
-                    st.success("帳號已啟用")
-                elif action == "停用帳號":
-                    requests.put(f"{API_URL}/disable_user/{user_id}")
-                    st.success("帳號已停用")
-                elif action == "刪除帳號":
-                    requests.delete(f"{API_URL}/delete_user/{user_id}")
-                    st.success("帳號已刪除")
-                st.rerun()
-            except Exception as e:
-                st.error(f"執行失敗：{e}")
+                action = st.radio("選擇操作動作：", actions, horizontal=True)
+
+                if st.button("✅ 執行操作"):
+                    try:
+                        if action == "啟用帳號":
+                            requests.put(f"{API_URL}/enable_user/{user_id}")
+                            st.success("帳號已啟用")
+                        elif action == "停用帳號":
+                            requests.put(f"{API_URL}/disable_user/{user_id}")
+                            st.success("帳號已停用")
+                        elif action == "刪除帳號":
+                            requests.delete(f"{API_URL}/delete_user/{user_id}")
+                            st.success("帳號已刪除")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"執行操作失敗：{e}")
+
+        except Exception as e:
+            st.error(f"選取帳號時發生錯誤：{e}")
 
 # 🔙 返回主頁
 with stylable_container("back", css_styles="margin-top: 20px"):
