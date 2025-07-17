@@ -6,6 +6,14 @@ import pandas as pd
 def run():
     st.title("👤 帳號管理")
 
+    # ✅ 權限檢查
+    if "user" not in st.session_state or "is_admin" not in st.session_state:
+        st.error("⚠️ 請先登入")
+        st.stop()
+    if not st.session_state["is_admin"]:
+        st.error("⛔️ 只有管理員可以存取本頁")
+        st.stop()
+
     # ✅ 從後端 API 取得使用者列表
     api_url = "https://ocr-whisper-production-2.up.railway.app/users"
     response = requests.get(api_url)
@@ -36,27 +44,25 @@ def run():
         st.subheader("📋 使用者清單")
         gb = GridOptionsBuilder.from_dataframe(df)
         gb.configure_selection("single", use_checkbox=True)
-        gb.configure_column("啟用狀態", editable=False)
-        gb.configure_column("是否為管理員", editable=False)
-        gb.configure_column("帳號名稱", editable=False)
         gb.configure_column("使用者ID", editable=False)
+        gb.configure_column("帳號名稱", editable=False)
+        gb.configure_column("是否為管理員", editable=False)
+        gb.configure_column("啟用狀態", editable=False)
+        gb.configure_column("備註", editable=False)
 
         grid_options = gb.build()
-        grid_options["rowSelection"] = "single"
-
         grid_response = AgGrid(
             df,
             gridOptions=grid_options,
             update_mode="SELECTION_CHANGED",
-            height=400,
+            height=500,
             theme="streamlit"
         )
 
     # ✅ 顯示選取帳號詳細資訊與操作選單
     selected_rows = grid_response["selected_rows"]
-    if selected_rows is not None and len(selected_rows) > 0:
-        selected = pd.DataFrame(selected_rows).iloc[0]  # ✅ 修正錯誤點在這行
-
+    if selected_rows:
+        selected = selected_rows[0]
         with col2:
             st.subheader("🔧 帳號操作")
             st.write(f"👤 帳號：{selected['帳號名稱']}")
@@ -66,7 +72,6 @@ def run():
             current_status = selected["啟用狀態"]
             user_id = selected["使用者ID"]
 
-            # ✅ 根據目前狀態提供操作選單
             if current_status == "啟用中":
                 action = st.selectbox("請選擇操作", ["停用帳號", "刪除帳號"])
             else:
@@ -83,4 +88,4 @@ def run():
                 if res.status_code == 200:
                     st.success("✅ 操作成功，請重新整理頁面")
                 else:
-                    st.error(f"❌ 操作失敗：{res.text}"
+                    st.error(f"❌ 操作失敗：{res.text}")
