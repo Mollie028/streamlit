@@ -1,126 +1,64 @@
 import streamlit as st
 import requests
 import pandas as pd
-from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
-from streamlit_extras.stylable_container import stylable_container
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+from st_aggrid.shared import JsCode
 
-st.set_page_config(page_title="帳號清單", page_icon="👩‍💼", layout="wide")
-st.markdown("## 👩‍💼 帳號清單")
+st.set_page_config(page_title="帳號清單", page_icon="👩‍💼")
 
-API_URL = "https://ocr-whisper-production-2.up.railway.app"
+st.title("👩‍💼 帳號清單")
 
-def fetch_users():
-    try:
-        response = requests.get(f"{API_URL}/users")
-        response.raise_for_status()
-        return response.json()
-    except Exception as e:
-        st.error(f"❌ 取得帳號資料失敗：{e}")
-        return []
+st.markdown("---")
 
+# 🚨 輔助函式：狀態下拉選單
+def status_options(status):
+    if status == "啟用中":
+        return ["停用帳號", "刪除帳號"]
+    else:
+        return ["啟用帳號", "刪除帳號"]
+
+# ✅ 輔助函式：處理使用者資料
 def process_users(users):
-    df = pd.DataFrame(users)
-    if df.empty:
-        return df
-
-    # 檢查必要欄位是否存在
-    required_cols = ["id", "username", "company", "is_admin", "status", "note"]
-    missing_cols = [col for col in required_cols if col not in df.columns]
-    if missing_cols:
-        st.error(f"⚠️ 回傳資料缺少欄位：{', '.join(missing_cols)}")
+    if not isinstance(users, list):
+        st.error("回傳資料格式錯誤")
+        return pd.DataFrame()
+    if len(users) == 0:
+        st.warning("尚無有效使用者資料，請稍後再試。")
         return pd.DataFrame()
 
-    df = df.rename(columns={
-        "id": "使用者ID",
-        "username": "帳號名稱",
-        "company": "公司名稱",
-        "is_admin": "是否為管理員",
-        "status": "狀態",
-        "note": "備註"
-    })
+    df = pd.DataFrame(users)
 
-    df["是否為管理員"] = df["是否為管理員"].astype(bool)
+    # ✅ 安全處理缺少欄位
+    if "公司名稱" not in df.columns:
+        df["公司名稱"] = "GSLD"
+    if "狀態" not in df.columns:
+        df["狀態"] = "啟用中"
 
-    def status_options(status):
-        if status == "啟用中":
-            return ["啟用中", "停用帳號", "刪除帳號"]
-        elif status == "已停用":
-            return ["已停用", "啟用帳號", "刪除帳號"]
-        else:
-            return [status]
-
+    # ✅ 加上狀態選項欄位
     df["狀態選項"] = df["狀態"].apply(status_options)
+
     return df
 
-def update_users(changes):
-    for row in changes:
-        user_id = row.get("使用者ID")
-        status = row.get("狀態")
-        note = row.get("備註")
-        is_admin = row.get("是否為管理員")
+# ✅ 呼叫 API
+try:
+    res = requests.get("https://ocr-whisper-production-2.up.railway.app/users")
+    users = res.json()
+    df = process_users(users)
 
-        if status == "刪除帳號":
-            requests.delete(f"{API_URL}/delete_user/{user_id}")
-        elif status == "停用帳號":
-            requests.put(f"{API_URL}/disable_user/{user_id}")
-        elif status == "啟用帳號":
-            requests.put(f"{API_URL}/enable_user/{user_id}")
-        else:
-            payload = {
-                "note": note,
-                "is_admin": is_admin
-            }
-            requests.put(f"{API_URL}/update_user/{user_id}", json=payload)
+    if not df.empty:
+        gb = GridOptionsBuilder.from_dataframe(df)
+        gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
+        gb.configure_default_column(editable=True)
+        gb.configure_column("狀態", editable=True, cellEditor="agSelectCellEditor",
+                            cellEditorParams={"values": ["啟用中", "停用帳號", "刪除帳號"]})
+        gb.configure_column("備註", editable=True)
 
-users = fetch_users()
-df = process_users(users)
+        gridOptions = gb.build()
+        AgGrid(df, gridOptions=gridOptions, update_mode=GridUpdateMode.VALUE_CHANGED)
 
-if df.empty:
-    st.warning("⚠️ 尚無有效使用者資料，請稍後再試。")
-    st.stop()
+        st.button("💾 儲存變更")
+except Exception as e:
+    st.error(f"讀取使用者資料失敗：{e}")
 
-df["狀態選項"] = df["狀態選項"].apply(lambda x: x if isinstance(x, list) else [])
-
-gb = GridOptionsBuilder.from_dataframe(df)
-gb.configure_column("是否為管理員", editable=True, cellEditor="agCheckboxCellEditor")
-gb.configure_column("備註", editable=True)
-gb.configure_column("狀態", editable=True, cellEditor="agSelectCellEditor", cellEditorParams={"values": []})
-gb.configure_column("狀態選項", hide=True)
-
-gridOptions = gb.build()
-
-custom_js = JsCode("""
-function(params) {
-    if (params.data && params.data['狀態選項']) {
-        return {
-            values: params.data['狀態選項']
-        }
-    }
-    return {
-        values: []
-    }
-}
-""")
-for col in gridOptions["columnDefs"]:
-    if col["field"] == "狀態":
-        col["cellEditorParams"] = custom_js
-
-grid_response = AgGrid(
-    df,
-    gridOptions=gridOptions,
-    update_mode="MODEL_CHANGED",
-    fit_columns_on_grid_load=True,
-    theme="streamlit",
-    height=380,
-    enable_enterprise_modules=False
-)
-
-with stylable_container("save-btn", css_styles="button {margin-top: 1rem;}"):
-    if st.button("💾 儲存變更"):
-        updated_rows = grid_response["data"]
-        update_users(updated_rows.to_dict(orient="records"))
-        st.success("✅ 已更新帳號資料！")
-
-with stylable_container("back-btn", css_styles="button {margin-top: 1rem;}"):
-    if st.button("🔙 返回主頁"):
-        st.switch_page("首頁.py")
+st.markdown("---")
+st.button("⬅️ 返回主頁")
