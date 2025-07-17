@@ -1,6 +1,8 @@
 import streamlit as st
 from st_aggrid import AgGrid, GridOptionsBuilder
 import requests
+import pandas as pd  
+
 
 # ✅ run() 支援 app.py 呼叫
 def run():
