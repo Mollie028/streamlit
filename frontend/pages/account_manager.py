@@ -1,120 +1,106 @@
 import streamlit as st
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-import pandas as pd
+from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 import requests
+import pandas as pd
 
+# ✅ run() 支援 app.py 呼叫
 def run():
     st.title("👤 帳號管理")
 
+    # ✅ 登出按鈕
     if st.button("🔙 登出"):
         st.session_state.clear()
-        st.success("✅ 已登出，請重新整理畫面")
+        st.success("✅ 已登出，請重新整理頁面")
         return
 
-    # ➤ 基本資訊
-    api_base = "https://ocr-whisper-production-2.up.railway.app"
-    current_user = st.session_state.get("user", {})
-    is_admin = current_user.get("is_admin", False)
-    current_username = current_user.get("username", "")
+    # ✅ 使用者身分（從 session 判斷）
+    current_user = st.session_state.get("username", "")
+    is_admin = st.session_state.get("is_admin", False)
 
-    # ➤ 取得使用者資料
+    # ✅ 取得所有使用者資料
+    api_base = "https://ocr-whisper-production-2.up.railway.app"
     res = requests.get(f"{api_base}/users")
     if res.status_code != 200:
         st.error("❌ 無法取得帳號資料")
         return
     users = res.json()
 
-    # ➤ 搜尋欄位
+    # ✅ 搜尋欄位
     keyword = st.text_input("🔍 搜尋使用者 ID 或帳號名稱")
 
-    # ➤ 整理成 DataFrame
-    df_raw = []
+    # ✅ 整理 DataFrame
+    df_data = []
     for u in users:
-        df_raw.append({
-            "user_id": u["id"],
-            "username": u["username"],
-            "is_admin": u["is_admin"],
-            "status": "啟用中" if u["is_active"] else "已停用",
-            "note": u.get("note", "")
+        df_data.append({
+            "使用者ID": u["id"],
+            "帳號名稱": u["username"],
+            "是否為管理員": "✅" if u["is_admin"] else "",
+            "啟用狀態": "啟用中" if u["is_active"] else "已停用",
+            "備註": u.get("note", ""),
         })
-    df = pd.DataFrame(df_raw)
+    df = pd.DataFrame(df_data)
 
-    # ➤ 關鍵字過濾
+    # ✅ 權限檢查：非管理員只能看自己
+    if not is_admin:
+        df = df[df["帳號名稱"] == current_user]
+
+    # ✅ 搜尋過濾
     if keyword:
-        df = df[
-            df["user_id"].astype(str).str.contains(keyword) |
-            df["username"].str.contains(keyword)
-        ]
+        df = df[df["使用者ID"].astype(str).str.contains(keyword) | df["帳號名稱"].str.contains(keyword)]
 
     if df.empty:
-        st.warning("查無符合條件的帳號")
+        st.warning("查無符合條件的使用者")
         return
 
-    # ➤ 顯示 AgGrid 表格
+    # ✅ AgGrid 表格（多選 + 備註可編輯）
     st.subheader("📋 使用者清單")
     gb = GridOptionsBuilder.from_dataframe(df)
-    gb.configure_selection("multiple", use_checkbox=True, use_checkbox_for_row=True)
-    gb.configure_column("note", editable=True, header_name="備註")
-    gb.configure_column("user_id", header_name="使用者ID", width=90)
-    gb.configure_column("username", header_name="帳號名稱", width=130)
-    gb.configure_column("is_admin", header_name="是否為管理員", width=130)
-    gb.configure_column("status", header_name="啟用狀態", width=110)
+    gb.configure_selection("multiple", use_checkbox=True)  # ✅ 修正版本
+    gb.configure_column("備註", editable=True)
     grid = AgGrid(
         df,
         gridOptions=gb.build(),
-        update_mode=GridUpdateMode.MODEL_CHANGED,
-        height=380,
+        update_mode="MODEL_CHANGED",
+        theme="streamlit",
         fit_columns_on_grid_load=True,
-        theme="streamlit"
+        height=380
     )
+    updated_df = grid["data"]
+    selected_rows = grid["selected_rows"]
 
-    selected_df = pd.DataFrame(grid["selected_rows"])
-    edited_df = grid["data"]
-
-    # ➤ 處理多筆選取操作
-    if not selected_df.empty:
-        st.markdown("---")
+    # ✅ 操作按鈕區塊（僅限管理員）
+    if is_admin:
         st.subheader("🔧 批次帳號操作")
-
-        selected_ids = selected_df["user_id"].tolist()
-        selected_usernames = selected_df["username"].tolist()
-
-        if not is_admin and any(name != current_username for name in selected_usernames):
-            st.error("⛔ 非管理員僅能操作自己帳號")
-            return
-
-        action = st.selectbox("請選擇操作", ["啟用帳號", "停用帳號", "刪除帳號", "修改密碼"])
-
-        if action == "修改密碼":
-            new_pw = st.text_input("🔑 請輸入新密碼", type="password")
-            if not new_pw:
-                st.warning("請輸入新密碼")
-                return
-
+        action = st.selectbox("請選擇操作類型", ["無", "啟用帳號", "停用帳號", "刪除帳號"])
         if st.button("✅ 執行操作"):
-            success = 0
-            for uid in selected_ids:
+            if not selected_rows:
+                st.warning("請至少選取一筆使用者")
+                return
+            success_count = 0
+            for row in selected_rows:
+                uid = row["使用者ID"]
                 if action == "啟用帳號":
                     r = requests.post(f"{api_base}/enable_user/{uid}")
                 elif action == "停用帳號":
                     r = requests.post(f"{api_base}/disable_user/{uid}")
                 elif action == "刪除帳號":
                     r = requests.delete(f"{api_base}/delete_user/{uid}")
-                elif action == "修改密碼":
-                    r = requests.put(f"{api_base}/update_user_password/{uid}", json={"new_password": new_pw})
                 else:
                     continue
                 if r.status_code == 200:
-                    success += 1
-            st.success(f"✅ 已成功操作 {success} 筆帳號")
+                    success_count += 1
+            st.success(f"✅ 成功執行 {action}：{success_count} 筆")
 
-    # ➤ 儲存備註欄位
+    # ✅ 儲存備註變更（全部欄位都更新）
     if st.button("💾 儲存備註變更"):
-        success = 0
-        for index, row in pd.DataFrame(edited_df).iterrows():
-            uid = row["user_id"]
-            note = row["note"]
-            r = requests.put(f"{api_base}/update_user/{uid}", json={"note": note})
-            if r.status_code == 200:
-                success += 1
-        st.success(f"📝 備註已更新 {success} 筆")
+        update_count = 0
+        for i, row in updated_df.iterrows():
+            uid = row["使用者ID"]
+            note = row["備註"]
+            user = next((u for u in users if u["id"] == uid), None)
+            if user and user.get("note", "") != note:
+                r = requests.put(f"{api_base}/update_user/{uid}", json={"note": note})
+                if r.status_code == 200:
+                    update_count += 1
+        st.success(f"✅ 已更新 {update_count} 筆備註")
+
