@@ -113,3 +113,7 @@ with stylable_container("back", css_styles="margin-top: 20px"):
     if st.button("🔙 返回主頁"):
         st.session_state["current_page"] = "home"
         st.rerun()
+
+# ✅ run() 支援 app.py 呼叫
+def run():
+    pass
