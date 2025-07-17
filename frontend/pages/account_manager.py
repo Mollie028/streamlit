@@ -1,8 +1,7 @@
 import streamlit as st
 from st_aggrid import AgGrid, GridOptionsBuilder
 import requests
-import pandas as pd  
-
+import pandas as pd
 
 # ✅ run() 支援 app.py 呼叫
 def run():
@@ -21,28 +20,22 @@ def run():
         return
 
     # ✅ 整理資料表格
-    rows = []
+    df = []
     for u in users:
-        rows.append({
+        df.append({
             "使用者ID": u["id"],
             "帳號名稱": u["username"],
             "是否為管理員": "✅" if u["is_admin"] else "",
             "啟用狀態": "啟用中" if u["is_active"] else "已停用",
             "備註": u.get("note", "")
         })
-
-    df = pd.DataFrame(rows)
-
-    if df.empty:
-        st.warning("⚠️ 目前使用者資料為空")
-        return
-
+    df = pd.DataFrame(df)
 
     # ✅ 顯示帳號清單表格（使用 AgGrid）
     col1, col2 = st.columns([2, 1])
     with col1:
         st.subheader("📋 使用者清單")
-        gb = GridOptionsBuilder.from_dataframe(pd.DataFrame(df))
+        gb = GridOptionsBuilder.from_dataframe(df)
         gb.configure_selection("single", use_checkbox=True)
         gb.configure_column("啟用狀態", editable=False)
         gb.configure_column("是否為管理員", editable=False)
@@ -62,7 +55,7 @@ def run():
 
     # ✅ 顯示選取帳號詳細資訊與操作選單
     selected_rows = grid_response["selected_rows"]
-    if selected_rows:
+    if selected_rows is not None and len(selected_rows) > 0:
         selected = selected_rows[0]
         with col2:
             st.subheader("🔧 帳號操作")
