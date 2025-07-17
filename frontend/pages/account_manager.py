@@ -5,67 +5,79 @@ from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
 st.set_page_config(page_title="帳號清單", page_icon="👩‍💼")
 
-REQUIRED_COLUMNS = ["status", "company"]
-
-# 狀態選單
+# 🔸 建立狀態選項下拉選單
 def status_options(status):
     if status == "啟用中":
-        return ["停用帳號", "刪除帳號"]
+        return ["啟用中", "停用帳號", "刪除帳號"]
+    elif status == "已停用":
+        return ["已停用", "啟用帳號", "刪除帳號"]
     else:
-        return ["啟用帳號", "刪除帳號"]
+        return [status]  # 保留未知狀態
 
-# 處理資料
+# 🔸 處理回傳資料為 DataFrame
 def process_users(users):
-    if not isinstance(users, list):
-        st.error("❌ 後端回傳格式錯誤")
-        return pd.DataFrame()
-
-    if not users:
-        st.warning("⚠️ 尚無有效使用者資料，請稍後再試。")
-        return pd.DataFrame()
-
     df = pd.DataFrame(users)
+    if df.empty:
+        return df
 
-    # 檢查是否缺欄位
-    missing_columns = [col for col in REQUIRED_COLUMNS if col not in df.columns]
-    if missing_columns:
-        st.error(f"⚠️ 回傳資料缺少欄位：{', '.join(missing_columns)}")
-        return pd.DataFrame()
+    # 顯示欄位名稱轉換
+    rename_map = {
+        "id": "使用者ID",
+        "username": "帳號名稱",
+        "company": "公司名稱",
+        "is_admin": "是否為管理員",
+        "status": "狀態",
+        "note": "備註"
+    }
+    df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns}, inplace=True)
 
-    # 加上狀態下拉選單欄位
-    df["狀態選項"] = df["status"].apply(status_options)
+    # 補齊欄位
+    for col in ["是否為管理員", "備註", "狀態"]:
+        if col not in df.columns:
+            df[col] = ""
+
+    # 建立狀態選項欄位
+    df["狀態選項"] = df["狀態"].apply(status_options)
+
     return df
 
+# 🔸 主畫面
 def main():
     st.title("👩‍💼 帳號清單")
-    st.markdown("")
 
     try:
         res = requests.get("https://ocr-whisper-production-2.up.railway.app/users")
+        res.raise_for_status()
         users = res.json()
-        df = process_users(users)
-
-        if df.empty:
-            return
-
-        gb = GridOptionsBuilder.from_dataframe(df)
-        gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
-        gb.configure_default_column(editable=True)
-
-        # 下拉選單欄位
-        gb.configure_column("status", editable=True, cellEditor="agSelectCellEditor",
-                            cellEditorParams={"values": ["啟用中", "停用帳號", "刪除帳號"]})
-        gb.configure_column("note", editable=True)  # 備註欄可編輯
-
-        gridOptions = gb.build()
-        AgGrid(df, gridOptions=gridOptions, update_mode=GridUpdateMode.VALUE_CHANGED)
-
-        st.button("💾 儲存變更")
-
     except Exception as e:
-        st.error(f"❌ 資料載入失敗：{e}")
+        st.error(f"❌ 取得使用者資料失敗：{e}")
+        return
 
-    st.markdown("")
+    df = process_users(users)
+
+    if df.empty:
+        st.info("目前尚無使用者資料")
+        return
+
+    # AgGrid 設定
+    gb = GridOptionsBuilder.from_dataframe(df)
+    gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
+    gb.configure_default_column(editable=True)
+
+    if "狀態" in df.columns:
+        gb.configure_column("狀態", editable=True, cellEditor="agSelectCellEditor",
+                            cellEditorParams={"values": ["啟用中", "停用帳號", "刪除帳號"]})
+    if "備註" in df.columns:
+        gb.configure_column("備註", editable=True)
+    if "是否為管理員" in df.columns:
+        gb.configure_column("是否為管理員", editable=True, cellEditor="agCheckboxCellEditor")
+
+    gridOptions = gb.build()
+
+    AgGrid(df, gridOptions=gridOptions, update_mode=GridUpdateMode.VALUE_CHANGED,
+           fit_columns_on_grid_load=True, height=380, theme="streamlit")
+
+    st.button("💾 儲存變更")
     st.button("⬅️ 返回主頁")
 
 # ✅ 提供 app.py 呼叫
