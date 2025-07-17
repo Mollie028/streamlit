@@ -6,49 +6,45 @@ import pandas as pd
 def run():
     st.title("👤 帳號管理")
 
-    # ✅ 權限檢查
+    # ✅ 權限檢查（未登入 or 非管理員擋住）
     if "user" not in st.session_state or "is_admin" not in st.session_state:
-        st.error("⚠️ 請先登入")
+        st.warning("⚠️ 請先登入")
         st.stop()
     if not st.session_state["is_admin"]:
-        st.error("⛔️ 只有管理員可以存取本頁")
+        st.error("⛔️ 僅限管理員操作本頁面")
         st.stop()
 
-    # ✅ 從後端 API 取得使用者列表
+    # ✅ 從 API 取得使用者列表
     api_url = "https://ocr-whisper-production-2.up.railway.app/users"
-    response = requests.get(api_url)
-    if response.status_code != 200:
-        st.error("❌ 無法取得使用者資料")
+    try:
+        response = requests.get(api_url)
+        response.raise_for_status()
+    except requests.RequestException as e:
+        st.error(f"❌ 無法取得使用者資料：{e}")
         return
+
     users = response.json()
-
     if not users:
-        st.warning("⚠️ 目前尚無帳號資料")
+        st.info("📭 尚無使用者資料")
         return
 
-    # ✅ 整理資料表格
-    df = []
-    for u in users:
-        df.append({
-            "使用者ID": u["id"],
-            "帳號名稱": u["username"],
-            "是否為管理員": "✅" if u["is_admin"] else "",
-            "啟用狀態": "啟用中" if u["is_active"] else "已停用",
-            "備註": u.get("note", "")
-        })
-    df = pd.DataFrame(df)
+    # ✅ 整理資料表格格式
+    df = pd.DataFrame([{
+        "使用者ID": u["id"],
+        "帳號名稱": u["username"],
+        "是否為管理員": "✅" if u["is_admin"] else "",
+        "啟用狀態": "啟用中" if u["is_active"] else "已停用",
+        "備註": u.get("note", "")
+    } for u in users])
 
-    # ✅ 顯示帳號清單表格（使用 AgGrid）
+    # ✅ 顯示帳號表格（AgGrid）
     col1, col2 = st.columns([2, 1])
     with col1:
         st.subheader("📋 使用者清單")
         gb = GridOptionsBuilder.from_dataframe(df)
         gb.configure_selection("single", use_checkbox=True)
-        gb.configure_column("使用者ID", editable=False)
-        gb.configure_column("帳號名稱", editable=False)
-        gb.configure_column("是否為管理員", editable=False)
-        gb.configure_column("啟用狀態", editable=False)
-        gb.configure_column("備註", editable=False)
+        for col in ["使用者ID", "帳號名稱", "是否為管理員", "啟用狀態", "備註"]:
+            gb.configure_column(col, editable=False)
 
         grid_options = gb.build()
         grid_response = AgGrid(
@@ -59,18 +55,18 @@ def run():
             theme="streamlit"
         )
 
-    # ✅ 顯示選取帳號詳細資訊與操作選單
+    # ✅ 帳號操作區塊（單筆操作）
     selected_rows = grid_response["selected_rows"]
     if selected_rows:
         selected = selected_rows[0]
         with col2:
             st.subheader("🔧 帳號操作")
-            st.write(f"👤 帳號：{selected['帳號名稱']}")
-            st.write(f"🆔 ID：{selected['使用者ID']}")
-            st.write(f"🔒 狀態：{selected['啟用狀態']}")
+            st.markdown(f"👤 帳號名稱：**{selected['帳號名稱']}**")
+            st.markdown(f"🆔 使用者 ID：`{selected['使用者ID']}`")
+            st.markdown(f"🔒 目前狀態：**{selected['啟用狀態']}**")
 
-            current_status = selected["啟用狀態"]
             user_id = selected["使用者ID"]
+            current_status = selected["啟用狀態"]
 
             if current_status == "啟用中":
                 action = st.selectbox("請選擇操作", ["停用帳號", "刪除帳號"])
@@ -84,8 +80,11 @@ def run():
                     res = requests.post(f"{api_url}/enable_user/{user_id}")
                 elif action == "刪除帳號":
                     res = requests.delete(f"{api_url}/delete_user/{user_id}")
+                else:
+                    st.warning("⚠️ 未選擇有效操作")
+                    return
 
                 if res.status_code == 200:
-                    st.success("✅ 操作成功，請重新整理頁面")
+                    st.success("✅ 操作成功，請重新整理頁面以查看最新狀態")
                 else:
                     st.error(f"❌ 操作失敗：{res.text}")
