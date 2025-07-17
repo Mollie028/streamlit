@@ -6,10 +6,10 @@ from streamlit_extras.stylable_container import stylable_container
 
 API_URL = "https://ocr-whisper-production-2.up.railway.app"
 
-st.set_page_config(page_title="帳號清單", page_icon="👩‍🏢", layout="wide")
-st.markdown("## 👩‍🏢 帳號清單")
+st.set_page_config(page_title="帳號清單", page_icon="👩‍💼", layout="wide")
+st.markdown("## 👩‍💼 帳號清單")
 
-# 🧹 限管理員才能進入
+# 🧩 限管理員才能進入
 current_user = st.session_state.get("user_info", {})
 if not current_user.get("is_admin", False):
     st.warning("此頁面僅限管理員使用")
@@ -41,7 +41,11 @@ def process_users(users):
     df["是否為管理員"] = df["是否為管理員"].astype(bool)
     df["啟用狀態"] = df["啟用狀態"].astype(bool)
     df["狀態"] = df["啟用狀態"].apply(lambda x: "啟用中" if x else "已停用")
-    df["狀態選項"] = df["啟用狀態"].apply(lambda x: ["停用帳號", "刪除帳號"] if x else ["啟用帳號", "刪除帳號"])
+
+    def get_options(val):
+        return ["停用帳號", "刪除帳號"] if val == "啟用中" else ["啟用帳號", "刪除帳號"]
+
+    df["狀態選項"] = df["狀態"].apply(get_options)
     return df
 
 # 🚀 主流程
@@ -52,27 +56,27 @@ if df.empty:
     st.info("尚無有效使用者資料，請稍後再試。")
     st.stop()
 
-# 📊 表格欄位設定
+# ✅ 欄位設定
 gb = GridOptionsBuilder.from_dataframe(df)
 gb.configure_column("是否為管理員", editable=True, cellEditor="agCheckboxCellEditor")
 gb.configure_column("備註", editable=True)
+gb.configure_column("狀態", editable=True, cellEditor="agSelectCellEditor")
+gb.configure_column("狀態選項", hide=True)
 
-cell_editor_params = JsCode("""
+# ✅ 加入動態下拉 JS
+custom_js = JsCode("""
 function(params) {
     if (params.data && params.data['狀態選項']) {
-        return {
-            values: params.data['狀態選項']
-        }
+        return { values: params.data['狀態選項'] };
     } else {
-        return {
-            values: ['啟用帳號', '停用帳號', '刪除帳號']
-        }
+        return { values: ['啟用帳號', '停用帳號', '刪除帳號'] };
     }
 }
 """)
 
-gb.configure_column("狀態", editable=True, cellEditor="agSelectCellEditor", cellEditorParams=cell_editor_params)
-gb.configure_column("狀態選項", hide=True)
+for col in gb.build()["columnDefs"]:
+    if col["field"] == "狀態":
+        col["cellEditorParams"] = custom_js
 
 # 📋 顯示表格
 grid_response = AgGrid(
@@ -86,14 +90,8 @@ grid_response = AgGrid(
 )
 
 updated_rows = grid_response["data"].to_dict("records")
-for row in updated_rows:
-    if "狀態選項" not in row or not isinstance(row["狀態選項"], list):
-        if row.get("狀態") == "啟用中":
-            row["狀態選項"] = ["停用帳號", "刪除帳號"]
-        else:
-            row["狀態選項"] = ["啟用帳號", "刪除帳號"]
 
-# 📅 儲存更動
+# 💾 儲存變更
 with stylable_container("save", css_styles="margin-top: 20px"):
     if st.button("📄 儲存變更"):
         success_count = 0
@@ -110,14 +108,12 @@ with stylable_container("save", css_styles="margin-top: 20px"):
                     requests.put(f"{API_URL}/disable_user/{uid}")
                 elif status_text == "啟用帳號":
                     requests.put(f"{API_URL}/enable_user/{uid}")
-
-                payload = {"is_admin": is_admin, "note": note}
-                requests.put(f"{API_URL}/update_user/{uid}", json=payload)
-
+                else:
+                    payload = {"is_admin": is_admin, "note": note}
+                    requests.put(f"{API_URL}/update_user/{uid}", json=payload)
                 success_count += 1
-
             except Exception as e:
-                st.error(f"❌ 更新使用者 {uid} 時發生錯誤：{e}")
+                st.error(f"❌ 使用者 {uid} 更新失敗：{e}")
 
         st.success(f"✅ 已成功儲存 {success_count} 筆資料變更")
         st.rerun()
@@ -128,6 +124,6 @@ with stylable_container("back", css_styles="margin-top: 10px"):
         st.session_state["current_page"] = "home"
         st.rerun()
 
-# ✅ run() 函數供 app.py 呼叫
+# ✅ 提供 app.py 呼叫用函數
 def run():
     pass
