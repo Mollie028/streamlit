@@ -58,7 +58,7 @@ with col1:
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_selection("single", use_checkbox=True)
     gb.configure_column("是否為管理員", editable=False)
-    gb.configure_column("啟用狀態", editable=False)  # 不隱藏，確保 selected_rows 包含這欄
+    gb.configure_column("啟用狀態", editable=False)  # 不隱藏，避免資料遺失
     grid_response = AgGrid(
         df,
         gridOptions=gb.build(),
@@ -78,13 +78,16 @@ with col2:
     else:
         try:
             selected = selected_rows[0]
-            st.write("✅ 選取列資料：", selected)  # 可關閉：debug用
+            st.write("✅ 選取列資料：", selected)  # 如需隱藏可註解
 
-            user_id = selected.get("使用者ID")
-            username = selected.get("帳號名稱")
-            is_active = selected.get("啟用狀態", False)
-            if isinstance(is_active, str):
-                is_active = is_active.lower() == "true"
+            # 防呆處理欄位
+            user_id = selected.get("使用者ID", "")
+            username = selected.get("帳號名稱", "")
+            is_active_raw = selected.get("啟用狀態", False)
+            if isinstance(is_active_raw, str):
+                is_active = is_active_raw.lower() == "true"
+            else:
+                is_active = bool(is_active_raw)
 
             if not user_id or not username:
                 st.warning("⚠️ 無法讀取選取帳號的完整資訊")
@@ -117,7 +120,7 @@ with col2:
                         st.error(f"執行操作失敗：{e}")
 
         except Exception as e:
-            st.error(f"選取帳號時發生錯誤：{e}")
+            st.error(f"選取帳號處理失敗：{e}")
 
 # 🔙 返回主頁
 with stylable_container("back", css_styles="margin-top: 20px"):
