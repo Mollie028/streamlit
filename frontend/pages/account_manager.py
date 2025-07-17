@@ -21,15 +21,22 @@ def run():
         return
 
     # ✅ 整理資料表格
-    df = []
+    rows = []
     for u in users:
-        df.append({
+        rows.append({
             "使用者ID": u["id"],
             "帳號名稱": u["username"],
             "是否為管理員": "✅" if u["is_admin"] else "",
             "啟用狀態": "啟用中" if u["is_active"] else "已停用",
             "備註": u.get("note", "")
         })
+
+    df = pd.DataFrame(rows)
+
+    if df.empty:
+        st.warning("⚠️ 目前使用者資料為空")
+        return
+
 
     # ✅ 顯示帳號清單表格（使用 AgGrid）
     col1, col2 = st.columns([2, 1])
