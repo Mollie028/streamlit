@@ -1,92 +1,104 @@
 import streamlit as st
-import requests
 import pandas as pd
+import requests
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+from frontend.utils.api import get_api_base_url
 
-st.set_page_config(page_title="帳號清單", page_icon="👩‍💼")
+API_BASE_URL = get_api_base_url()
 
-API_URL = "https://ocr-whisper-production-2.up.railway.app"
-
-def status_options(status):
-    if status == "啟用中":
-        return ["啟用中", "停用帳號", "刪除帳號"]
-    elif status == "已停用":
-        return ["已停用", "啟用帳號", "刪除帳號"]
-    else:
-        return [status]
+def get_all_users():
+    try:
+        response = requests.get(f"{API_BASE_URL}/users")
+        if response.status_code == 200:
+            return response.json()
+        else:
+            st.error("❌ 無法取得使用者資料。")
+            return []
+    except Exception as e:
+        st.error(f"❌ 發生錯誤：{e}")
+        return []
 
 def process_users(users):
     df = pd.DataFrame(users)
     if df.empty:
         return df
 
+    # 欄位對應：英文 → 中文
     rename_map = {
         "id": "使用者ID",
         "username": "帳號名稱",
         "company": "公司名稱",
         "is_admin": "是否為管理員",
-        "status": "狀態",
+        "is_active": "狀態",
         "note": "備註"
     }
     df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns}, inplace=True)
 
-    for col in ["是否為管理員", "備註", "狀態"]:
+    # 補欄位（若後端沒回傳）
+    for col in ["公司名稱", "狀態", "是否為管理員", "備註"]:
         if col not in df.columns:
             df[col] = ""
 
-    df["狀態選項"] = df["狀態"].apply(status_options)
+    # 將 True/False 的狀態轉換為文字
+    df["狀態"] = df["狀態"].apply(lambda x: "啟用中" if x else "已停用")
 
     return df
 
-def update_users(changes):
-    for row in changes:
-        user_id = row.get("使用者ID")
-        status = row.get("狀態")
-        note = row.get("備註", "")
-        is_admin = row.get("是否為管理員", False)
-
-        try:
-            if status == "刪除帳號":
-                requests.delete(f"{API_URL}/delete_user/{user_id}")
-            elif status == "停用帳號":
-                requests.put(f"{API_URL}/disable_user/{user_id}")
-            elif status == "啟用帳號":
-                requests.put(f"{API_URL}/enable_user/{user_id}")
-            else:
-                # 備註與管理員權限更新
-                payload = {"note": note, "is_admin": is_admin}
-                requests.put(f"{API_URL}/update_user/{user_id}", json=payload)
-        except Exception as e:
-            st.warning(f"⚠️ 更新帳號 {user_id} 失敗：{e}")
-
-def main():
-    st.title("👩‍💼 帳號清單")
-
+def update_user(user):
+    user_id = user["使用者ID"]
+    payload = {
+        "is_admin": user["是否為管理員"],
+        "note": user["備註"]
+    }
     try:
-        res = requests.get(f"{API_URL}/users")
-        res.raise_for_status()
-        users = res.json()
-    except Exception as e:
-        st.error(f"❌ 取得使用者資料失敗：{e}")
+        response = requests.put(f"{API_BASE_URL}/update_user/{user_id}", json=payload)
+        return response.status_code == 200
+    except:
+        return False
+
+def change_user_status(user_id, action):
+    try:
+        url = f"{API_BASE_URL}/"
+        if action == "啟用中":
+            url += f"enable_user/{user_id}"
+        elif action == "停用帳號":
+            url += f"disable_user/{user_id}"
+        elif action == "刪除帳號":
+            url += f"delete_user/{user_id}"
+        response = requests.put(url)
+        return response.status_code == 200
+    except:
+        return False
+
+def run():
+    st.markdown("""
+        <h2 style='display: flex; align-items: center;'>
+            <span style='font-size: 1.8em;'>🧑‍💼 帳號清單</span>
+        </h2>
+    """, unsafe_allow_html=True)
+
+    users = get_all_users()
+    if not users:
+        st.warning("⚠️ 尚無有效使用者資料，請稍後再試。")
         return
 
     df = process_users(users)
 
-    if df.empty:
-        st.info("目前尚無使用者資料")
+    # 檢查欄位是否齊全
+    required_cols = ["使用者ID", "帳號名稱", "公司名稱", "是否為管理員", "狀態", "備註"]
+    missing_cols = [col for col in required_cols if col not in df.columns]
+    if missing_cols:
+        st.error(f"⚠️ 回傳資料缺少欄位：{', '.join(missing_cols)}")
         return
 
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
-    gb.configure_default_column(editable=True)
+    gb.configure_default_column(editable=False)
 
-    if "狀態" in df.columns:
-        gb.configure_column("狀態", editable=True, cellEditor="agSelectCellEditor",
-                            cellEditorParams={"values": ["啟用中", "停用帳號", "刪除帳號"]})
-    if "備註" in df.columns:
-        gb.configure_column("備註", editable=True)
-    if "是否為管理員" in df.columns:
-        gb.configure_column("是否為管理員", editable=True, cellEditor="agCheckboxCellEditor")
+    gb.configure_column("狀態", editable=True, cellEditor="agSelectCellEditor",
+                        cellEditorParams={"values": ["啟用中", "停用帳號", "刪除帳號"]})
+    gb.configure_column("備註", editable=True)
+    gb.configure_column("是否為管理員", editable=True, cellEditor="agCheckboxCellEditor")
 
     gridOptions = gb.build()
 
@@ -94,21 +106,30 @@ def main():
         df,
         gridOptions=gridOptions,
         update_mode=GridUpdateMode.MANUAL,
-        fit_columns_on_grid_load=True,
         height=380,
-        theme="streamlit",
-        allow_unsafe_jscode=True
+        fit_columns_on_grid_load=True,
+        allow_unsafe_jscode=True,
+        theme="streamlit"
     )
 
-    # 🔸 實際儲存變更
+    updated_rows = grid_response["data"]
+    selected_rows = updated_rows
+
     if st.button("💾 儲存變更"):
-        updated_data = grid_response["data"]
-        update_users(updated_data.to_dict("records"))
-        st.success("✅ 變更已儲存")
+        success = True
+        for _, user in selected_rows.iterrows():
+            update_success = update_user(user)
+            status_success = change_user_status(user["使用者ID"], user["狀態"])
+            if not update_success or not status_success:
+                success = False
+        if success:
+            st.success("✅ 所有變更已成功儲存！")
+        else:
+            st.error("❌ 儲存過程中有部分失敗，請稍後再試。")
 
-    if st.button("⬅️ 返回主頁"):
-        st.switch_page("首頁.py")
-
-# 讓 app.py 可呼叫
-def run():
-    main()
+    st.markdown("""
+        <br>
+        <a href="/" target="_self">
+            <button style='padding: 0.4em 1.2em; font-size: 1.1em;'>🔙 返回主頁</button>
+        </a>
+    """, unsafe_allow_html=True)
