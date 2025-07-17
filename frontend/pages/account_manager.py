@@ -3,7 +3,6 @@ from st_aggrid import AgGrid, GridOptionsBuilder
 import requests
 import pandas as pd
 
-# ✅ run() 支援 app.py 呼叫
 def run():
     st.title("👤 帳號管理")
 
@@ -56,7 +55,8 @@ def run():
     # ✅ 顯示選取帳號詳細資訊與操作選單
     selected_rows = grid_response["selected_rows"]
     if selected_rows is not None and len(selected_rows) > 0:
-        selected = selected_rows[0]
+        selected = pd.DataFrame(selected_rows).iloc[0]  # ✅ 修正錯誤點在這行
+
         with col2:
             st.subheader("🔧 帳號操作")
             st.write(f"👤 帳號：{selected['帳號名稱']}")
