@@ -1,106 +1,113 @@
 import streamlit as st
+import pandas as pd
 import requests
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-from st_aggrid.shared import JsCode
+from st_aggrid import AgGrid, GridOptionsBuilder, JsCode, GridUpdateMode
 
 API_URL = "https://ocr-whisper-production-2.up.railway.app"
 
-st.set_page_config(page_title="帳號清單", page_icon="🧑🏻‍💻", layout="wide")
-st.title("🧑🏻‍💻 帳號清單")
-
-# 取得所有使用者資料
-try:
-    response = requests.get(f"{API_URL}/users")
-    users = response.json()
-    if isinstance(users, dict) and "detail" in users:
-        st.warning("尚無有效使用者資料，請稍後再試。")
-        st.stop()
-except Exception as e:
-    st.error("❌ 無法取得使用者資料，請確認後端 API 是否正常。")
+# ✅ 權限檢查：非管理員禁止進入
+if not st.session_state.get("user_info", {}).get("is_admin", False):
+    st.error("🚫 無權限存取此頁面")
     st.stop()
 
-# 確保每筆資料都有完整欄位
-for user in users:
-    user.setdefault("status", "啟用中" if user.get("is_active", True) else "停用帳號")
-    user.setdefault("company", "未指定")
-    user.setdefault("note", "")
+st.set_page_config(page_title="帳號管理", page_icon="👤", layout="wide")
+st.title("👤 帳號清單")
 
-# 建立欄位顯示名稱對照表
-column_name_map = {
-    "id": "使用者ID",
-    "username": "帳號名稱",
-    "is_admin": "是否為管理員",
-    "company": "公司名稱",
-    "is_active": "啟用中",
-    "note": "備註",
-    "status": "狀態",
-}
+# 🔹 取得使用者清單
+def fetch_users():
+    try:
+        res = requests.get(f"{API_URL}/users")
+        res.raise_for_status()
+        return res.json()
+    except Exception as e:
+        st.error(f"❌ 無法取得使用者資料：{e}")
+        return []
 
-# 建立 AgGrid 欄位設定
-gb = GridOptionsBuilder.from_dataframe(pd.DataFrame(users))
+users = fetch_users()
+if not users:
+    st.stop()
 
-# 中文欄位順序
-display_columns = ["id", "username", "is_admin", "company", "is_active", "note", "status"]
-gb.configure_default_column(editable=False, resizable=True)
+# 🔹 整理成表格格式
+for u in users:
+    u["使用者ID"] = u.get("id", "")
+    u["帳號名稱"] = u.get("username", "")
+    u["是否為管理員"] = u.get("is_admin", False)
+    u["公司名稱"] = u.get("company", "") or u.get("company_name", "")
+    u["備註"] = u.get("note", "")
+    u["狀態"] = "啟用中" if u.get("is_active", True) else "已停用"
 
-gb.configure_column("id", header_name=column_name_map["id"], editable=False, width=90)
-gb.configure_column("username", header_name=column_name_map["username"], editable=False)
-gb.configure_column("is_admin", header_name=column_name_map["is_admin"], editable=False, cellRenderer="checkboxRenderer")
-gb.configure_column("company", header_name=column_name_map["company"], editable=True)
-gb.configure_column("is_active", header_name=column_name_map["is_active"], editable=False, cellRenderer="checkboxRenderer")
-gb.configure_column("note", header_name=column_name_map["note"], editable=True)
+    # 🔸 動態狀態選單
+    if u["狀態"] == "啟用中":
+        u["狀態選項"] = ["啟用中", "停用帳號", "刪除帳號"]
+    elif u["狀態"] == "已停用":
+        u["狀態選項"] = ["已停用", "啟用帳號", "刪除帳號"]
+    else:
+        u["狀態選項"] = [u["狀態"]]
 
-# 狀態欄位改為下拉選單
-status_options = ["啟用中", "停用帳號", "刪除帳號"]
-gb.configure_column(
-    "status",
-    header_name=column_name_map["status"],
-    editable=True,
-    cellEditor="agSelectCellEditor",
-    cellEditorParams={"values": status_options},
-)
+df = pd.DataFrame(users)[["使用者ID", "帳號名稱", "公司名稱", "是否為管理員", "狀態", "備註", "狀態選項"]]
 
-# 顯示 AgGrid 表格
-grid_response = AgGrid(
-    pd.DataFrame(users)[display_columns],
-    gridOptions=gb.build(),
-    height=380,
-    fit_columns_on_grid_load=True,
-    update_mode=GridUpdateMode.MANUAL,
-    allow_unsafe_jscode=True,
-    enable_enterprise_modules=False,
-)
+# 🔹 AgGrid 設定
+gb = GridOptionsBuilder.from_dataframe(df)
+gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
+gb.configure_column("是否為管理員", editable=True, cellEditor="agCheckboxCellEditor")
+gb.configure_column("備註", editable=True)
+gb.configure_column("狀態", editable=True, cellEditor="agSelectCellEditor", cellEditorParams={"values": []})
+gb.configure_column("狀態選項", hide=True)
 
-# 處理修改後資料
-updated_rows = grid_response["data"]
-
-# 儲存變更按鈕
-if st.button("💾 儲存變更"):
-    success_count = 0
-    for row in updated_rows.itertuples(index=False):
-        user_id = row.id
-        payload = {
-            "company": row.company,
-            "note": row.note
+# 🔹 動態 JS 注入下拉選單
+js = JsCode("""
+function(params) {
+    if (params.data && params.data['狀態選項']) {
+        return {
+            values: params.data['狀態選項']
         }
-        try:
-            # 更新基本資料
-            requests.put(f"{API_URL}/update_user/{user_id}", json=payload)
+    }
+    return { values: [] }
+}
+""")
+grid_options = gb.build()
+for col in grid_options["columnDefs"]:
+    if col["field"] == "狀態":
+        col["cellEditorParams"] = js
 
-            # 更新狀態
-            if row.status == "啟用中":
-                requests.put(f"{API_URL}/enable_user/{user_id}")
-            elif row.status == "停用帳號":
-                requests.put(f"{API_URL}/disable_user/{user_id}")
-            elif row.status == "刪除帳號":
-                requests.delete(f"{API_URL}/delete_user/{user_id}")
-            success_count += 1
-        except Exception:
-            pass
+# 🔹 顯示表格
+grid_return = AgGrid(
+    df,
+    gridOptions=grid_options,
+    update_mode=GridUpdateMode.MODEL_CHANGED,
+    fit_columns_on_grid_load=True,
+    theme="streamlit",
+    height=380,
+    allow_unsafe_jscode=True
+)
 
-    st.success(f"✅ 已成功儲存 {success_count} 筆資料。")
+# 🔹 點擊儲存變更
+if st.button("💾 儲存變更"):
+    updated_df = grid_return["data"]
+    success = 0
+    for row in updated_df.itertuples(index=False):
+        user_id = row.使用者ID
+        payload = {
+            "note": row.備註,
+            "is_admin": row.是否為管理員
+        }
+
+        # 狀態更新
+        if row.狀態 == "啟用帳號":
+            requests.put(f"{API_URL}/enable_user/{user_id}")
+        elif row.狀態 == "停用帳號":
+            requests.put(f"{API_URL}/disable_user/{user_id}")
+        elif row.狀態 == "刪除帳號":
+            requests.delete(f"{API_URL}/delete_user/{user_id}")
+
+        # 備註與權限更新
+        requests.put(f"{API_URL}/update_user/{user_id}", json=payload)
+        success += 1
+
+    st.success(f"✅ 已成功儲存 {success} 筆變更！")
     st.experimental_rerun()
 
-# 返回主頁
+# 🔙 返回主頁
 if st.button("🔙 返回主頁"):
-    st.switch_page("app.py")
+    st.session_state["current_page"] = "home"
+    st.rerun()
