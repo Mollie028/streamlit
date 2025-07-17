@@ -41,11 +41,7 @@ def process_users(users):
     df["是否為管理員"] = df["是否為管理員"].astype(bool)
     df["啟用狀態"] = df["啟用狀態"].astype(bool)
     df["狀態"] = df["啟用狀態"].apply(lambda x: "啟用中" if x else "已停用")
-
-    def get_options(val):
-        return ["停用帳號", "刪除帳號"] if val == "啟用中" else ["啟用帳號", "刪除帳號"]
-
-    df["狀態選項"] = df["狀態"].apply(get_options)
+    df["狀態選項"] = df["狀態"].apply(lambda x: ["停用帳號", "刪除帳號"] if x == "啟用中" else ["啟用帳號", "刪除帳號"])
     return df
 
 # 🚀 主流程
@@ -56,27 +52,32 @@ if df.empty:
     st.info("尚無有效使用者資料，請稍後再試。")
     st.stop()
 
-# ✅ 欄位設定
+# 📊 表格欄位設定
 gb = GridOptionsBuilder.from_dataframe(df)
 gb.configure_column("是否為管理員", editable=True, cellEditor="agCheckboxCellEditor")
 gb.configure_column("備註", editable=True)
-gb.configure_column("狀態", editable=True, cellEditor="agSelectCellEditor")
 gb.configure_column("狀態選項", hide=True)
 
-# ✅ 加入動態下拉 JS
-custom_js = JsCode("""
+# ✅ 動態下拉選單 JS 實作
+cell_editor_js = JsCode("""
 function(params) {
     if (params.data && params.data['狀態選項']) {
-        return { values: params.data['狀態選項'] };
-    } else {
-        return { values: ['啟用帳號', '停用帳號', '刪除帳號'] };
+        return {
+            values: params.data['狀態選項']
+        }
+    }
+    return {
+        values: []
     }
 }
 """)
 
-for col in gb.build()["columnDefs"]:
-    if col["field"] == "狀態":
-        col["cellEditorParams"] = custom_js
+gb.configure_column(
+    "狀態",
+    editable=True,
+    cellEditor="agSelectCellEditor",
+    cellEditorParams=cell_editor_js
+)
 
 # 📋 顯示表格
 grid_response = AgGrid(
@@ -112,10 +113,11 @@ with stylable_container("save", css_styles="margin-top: 20px"):
                     payload = {"is_admin": is_admin, "note": note}
                     requests.put(f"{API_URL}/update_user/{uid}", json=payload)
                 success_count += 1
-            except Exception as e:
-                st.error(f"❌ 使用者 {uid} 更新失敗：{e}")
+            except:
+                st.error(f"❌ 帳號 ID {uid} 更新失敗")
 
         st.success(f"✅ 已成功儲存 {success_count} 筆資料變更")
+        st.session_state["current_page"] = "account_manage"
         st.rerun()
 
 # 🔙 返回主頁
@@ -124,6 +126,6 @@ with stylable_container("back", css_styles="margin-top: 10px"):
         st.session_state["current_page"] = "home"
         st.rerun()
 
-# ✅ 提供 app.py 呼叫用函數
+# ✅ run() 支援 app.py 呼叫
 def run():
     pass
