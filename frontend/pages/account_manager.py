@@ -1,134 +1,109 @@
 import streamlit as st
-import pandas as pd
+from st_aggrid import AgGrid, GridOptionsBuilder
 import requests
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-from streamlit_extras.stylable_container import stylable_container
+import pandas as pd
 
-# ✅ 登入者資料（可整合到 session）
-login_user = st.session_state.get("account", None)
-login_role = st.session_state.get("role", None)
 
-# ✅ API 路徑（請依部署調整）
-API_BASE = "https://ocr-whisper-production-2.up.railway.app"
-
-def fetch_users():
-    try:
-        res = requests.get(f"{API_BASE}/users")
-        if res.status_code == 200:
-            return res.json()
-    except Exception as e:
-        st.error(f"無法取得使用者清單：{e}")
-    return []
-
-def update_user_password(user_id, new_password):
-    return requests.put(f"{API_BASE}/update_user_password/{user_id}", json={"new_password": new_password})
-
-def update_user(user_id, data):
-    return requests.put(f"{API_BASE}/update_user/{user_id}", json=data)
-
-def disable_user(user_id):
-    return requests.put(f"{API_BASE}/disable_user/{user_id}")
-
-def enable_user(user_id):
-    return requests.put(f"{API_BASE}/enable_user/{user_id}")
-
-def delete_user(user_id):
-    return requests.delete(f"{API_BASE}/delete_user/{user_id}")
-
+# ✅ run() 支援 app.py 呼叫
 def run():
-    st.page_link("app.py", label="🔒 登出", icon="🔙")
-    st.markdown("## 👤 帳號管理")
+    st.title("👤 帳號管理")
 
-    if login_role != "admin":
-        st.warning("只有管理員可以存取此頁面")
+    # ✅ 登出按鈕
+    if st.button("🔙 登出"):
+        st.session_state.clear()
+        st.success("✅ 已登出，請重新整理頁面")
         return
 
-    all_users = fetch_users()
-
-    # ✅ 資料預處理
-    df = pd.DataFrame(all_users)
-    if df.empty:
-        st.info("目前沒有任何使用者")
+    # ✅ 取得使用者資料
+    api_base = "https://ocr-whisper-production-2.up.railway.app"
+    res = requests.get(f"{api_base}/users")
+    if res.status_code != 200:
+        st.error("❌ 無法取得帳號資料")
         return
+    users = res.json()
 
-    df["是否為管理員"] = df["role"] == "admin"
-    df["啟用狀態"] = df["is_active"].map({True: "啟用中", False: "已停用"})
+    # ✅ 搜尋欄位
+    keyword = st.text_input("🔍 輸入使用者 ID 或帳號名稱查詢")
 
-    # ✅ 搜尋功能
-    keyword = st.text_input("🔍 搜尋使用者帳號或 ID")
+    # ✅ 整理成 DataFrame
+    df_raw = []
+    for u in users:
+        df_raw.append({
+            "使用者ID": u["id"],
+            "帳號名稱": u["username"],
+            "是否為管理員": "✅" if u["is_admin"] else "",
+            "啟用狀態": "啟用中" if u["is_active"] else "已停用",
+            "備註": u.get("note", "")
+        })
+    df = pd.DataFrame(df_raw)
+
+    # ✅ 關鍵字過濾
     if keyword:
-        df = df[df["username"].str.contains(keyword, na=False) | df["id"].astype(str).str.contains(keyword)]
+        df = df[df["使用者ID"].astype(str).str.contains(keyword) | df["帳號名稱"].str.contains(keyword)]
 
-    # ✅ AgGrid 設定
-    gb = GridOptionsBuilder.from_dataframe(df[["id", "username", "是否為管理員", "啟用狀態", "note"]])
-    gb.configure_selection(selection_mode="single", use_checkbox=True)
-    gb.configure_column("note", editable=True)
-    gb.configure_column("啟用狀態", editable=True, cellEditor="agSelectCellEditor", cellEditorParams={"values": ["啟用中", "停用帳號", "刪除帳號"]})
-    grid_options = gb.build()
+    if df.empty:
+        st.warning("查無符合條件的使用者")
+        return
 
-    with stylable_container("table-container", css=".st-emotion-cache-1r6slb0 {height: 380px;}"):
+    # ✅ 顯示 AgGrid 表格
+    col1, col2 = st.columns([2.2, 1])
+    with col1:
+        st.subheader("📋 使用者清單")
+        gb = GridOptionsBuilder.from_dataframe(df)
+        gb.configure_selection("single", use_checkbox=True)
+        for col in ["使用者ID", "帳號名稱", "是否為管理員", "啟用狀態", "備註"]:
+            gb.configure_column(col, editable=False)
         grid_response = AgGrid(
             df,
-            gridOptions=grid_options,
-            update_mode=GridUpdateMode.MANUAL,
-            fit_columns_on_grid_load=True,
-            height=380,
-            reload_data=True,
+            gridOptions=gb.build(),
+            update_mode="SELECTION_CHANGED",
+            height=400,
+            theme="streamlit"
         )
 
-    selected_rows = grid_response["selected_rows"]
-    if selected_rows:
+    # ✅ 操作選單區塊
+    selected_rows = grid_response.get("selected_rows", [])
+    if len(selected_rows) > 0:
         selected = selected_rows[0]
-        user_id = selected["id"]
-        username = selected["username"]
+        user_id = selected["使用者ID"]
+        username = selected["帳號名稱"]
+        status = selected["啟用狀態"]
 
-        st.markdown("---")
-        st.subheader("🔧 帳號操作")
-        st.write(f"👤 帳號：{username}")
-        st.write(f"🆔 ID：{user_id}")
-        st.write(f"🔒 狀態：{selected['啟用狀態']}")
+        with col2:
+            st.subheader("🔧 帳號操作")
+            st.write(f"🆔 ID：{user_id}")
+            st.write(f"👤 帳號：{username}")
+            st.write(f"🔒 狀態：{status}")
 
-        action = st.selectbox("請選擇操作", ["停用帳號", "啟用帳號", "刪除帳號", "修改密碼"])
-        new_password = None
-        if action == "修改密碼":
-            new_password = st.text_input("請輸入新密碼", type="password")
-
-        if st.button("✅ 執行操作"):
-            if action == "停用帳號":
-                res = disable_user(user_id)
-            elif action == "啟用帳號":
-                res = enable_user(user_id)
-            elif action == "刪除帳號":
-                res = delete_user(user_id)
-            elif action == "修改密碼":
-                if not new_password:
-                    st.warning("請輸入新密碼")
-                    return
-                res = update_user_password(user_id, new_password)
+            # ✅ 操作選單
+            if status == "啟用中":
+                action = st.selectbox("請選擇操作", ["停用帳號", "刪除帳號", "修改密碼"])
             else:
-                res = None
+                action = st.selectbox("請選擇操作", ["啟用帳號", "刪除帳號", "修改密碼"])
 
-            if res and res.status_code == 200:
-                st.success("操作成功！請重新整理頁面查看更新")
+            # ✅ 修改密碼欄位
+            if action == "修改密碼":
+                new_pw = st.text_input("🔑 新密碼", type="password")
             else:
-                st.error(f"操作失敗：{res.text if res else 'Unknown error'}")
+                new_pw = None
 
-    # ✅ 儲存備註與狀態變更
-    if st.button("💾 儲存變更"):
-        updated_rows = grid_response["data"]
-        for index, row in updated_rows.iterrows():
-            user_id = row["id"]
-            note = row.get("note", "")
-            status = row.get("啟用狀態", "啟用中")
+            # ✅ 執行操作
+            if st.button("✅ 執行操作"):
+                if action == "啟用帳號":
+                    r = requests.post(f"{api_base}/enable_user/{user_id}")
+                elif action == "停用帳號":
+                    r = requests.post(f"{api_base}/disable_user/{user_id}")
+                elif action == "刪除帳號":
+                    r = requests.delete(f"{api_base}/delete_user/{user_id}")
+                elif action == "修改密碼":
+                    if not new_pw:
+                        st.warning("請輸入新密碼")
+                        return
+                    r = requests.put(f"{api_base}/update_user_password/{user_id}", json={"new_password": new_pw})
+                else:
+                    r = None
 
-            if status == "刪除帳號":
-                delete_user(user_id)
-            elif status == "停用帳號":
-                disable_user(user_id)
-            elif status == "啟用中":
-                enable_user(user_id)
-
-            update_user(user_id, {"note": note})
-
-        st.success("所有變更已儲存！")
-
+                if r and r.status_code == 200:
+                    st.success("✅ 操作成功，請重新整理頁面")
+                else:
+                    st.error(f"❌ 操作失敗：{r.text if r else '無回應'}")
