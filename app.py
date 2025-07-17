@@ -1,108 +1,140 @@
 import streamlit as st
 import requests
-import pandas as pd
-from st_aggrid import AgGrid, GridOptionsBuilder
-from streamlit_extras.stylable_container import stylable_container
+from audio_recorder_streamlit import audio_recorder
+from core.config import API_BASE
 
-API_URL = "https://ocr-whisper-production-2.up.railway.app"
+st.set_page_config(page_title="名片辨識系統", layout="centered")
 
-def fetch_users():
-    try:
-        res = requests.get(f"{API_URL}/users")
-        res.raise_for_status()
-        return res.json()
-    except Exception as e:
-        st.error(f"無法抓取使用者資料：{e}")
-        return []
+# 初始化狀態
+if "current_page" not in st.session_state:
+    st.session_state["current_page"] = "login"
 
-def process_users(users):
-    df = pd.DataFrame(users)
-    if df.empty:
-        return df
+# 登出按鈕
+if st.session_state.get("access_token") and st.session_state["current_page"] != "login":
+    if st.button("🔓 登出"):
+        st.session_state.clear()
+        st.session_state["current_page"] = "login"
+        st.rerun()
 
-    df = df.rename(columns={
-        "id": "使用者ID",
-        "username": "帳號名稱",
-        "company_name": "公司名稱",
-        "is_admin": "是否為管理員",
-        "is_active": "啟用狀態",
-        "note": "備註"
-    })
-    df["是否為管理員"] = df["是否為管理員"].astype(bool)
-    df["啟用狀態"] = df["啟用狀態"].astype(bool)
+# ------------------------
+# 登入頁面
+# ------------------------
+if st.session_state["current_page"] == "login":
+    st.title("🔐 登入系統")
+    username = st.text_input("帳號")
+    password = st.text_input("密碼", type="password")
 
-    df["狀態"] = df["啟用狀態"].apply(lambda x: "啟用中" if x else "已停用")
+    col1, col2 = st.columns(2)
 
-    # 動態產生對應狀態選項
-    def get_options(active):
-        return ["啟用中", "停用帳號", "刪除帳號"] if active else ["已停用", "啟用帳號", "刪除帳號"]
+    with col1:
+        if st.button("登入"):
+            try:
+                res = requests.post(f"{API_BASE}/login", json={"username": username, "password": password})
+                if res.status_code == 200:
+                    result = res.json()
+                    st.session_state["access_token"] = result["access_token"]
+                    st.session_state["username"] = username
+                    st.session_state["role"] = result.get("role", "user")
+                    st.session_state["company_name"] = result.get("company_name", "")
 
-    df["狀態選項"] = df["啟用狀態"].apply(get_options)
-    return df
-
-def run():
-    st.set_page_config(page_title="帳號清單", page_icon="👩‍💼", layout="wide")
-    st.markdown("## 👩‍💼 帳號清單")
-
-    user = st.session_state.get("user_info", {})
-    if not user.get("is_admin", False):
-        st.warning("此頁面僅限管理員使用")
-        st.stop()
-
-    users = fetch_users()
-    df = process_users(users)
-
-    if df.empty:
-        st.info("還沒有任何使用者資料")
-        st.stop()
-
-    gb = GridOptionsBuilder.from_dataframe(df)
-    gb.configure_column("是否為管理員", editable=True, cellEditor="agCheckboxCellEditor")
-    gb.configure_column("備註", editable=True)
-    gb.configure_column("狀態", editable=True, cellEditor="agSelectCellEditor",
-                        cellEditorParams={"values": list(df["狀態選項"].iloc[0])})
-    gb.configure_column("狀態選項", hide=True)
-
-    grid = AgGrid(
-        df,
-        gridOptions=gb.build(),
-        update_mode="MODEL_CHANGED",
-        fit_columns_on_grid_load=True,
-        theme="streamlit",
-        height=400,
-        allow_unsafe_jscode=True
-    )
-
-    updated_rows = grid["data"].to_dict("records")
-
-    with stylable_container("save", css_styles="margin-top: 20px"):
-        if st.button("📄 儲存變更"):
-            success_count = 0
-            for row in updated_rows:
-                uid = row.get("使用者ID")
-                is_admin = row.get("是否為管理員", False)
-                note = row.get("備註", "")
-                status_text = row.get("狀態")
-
-                if status_text == "刪除帳號":
-                    requests.delete(f"{API_URL}/delete_user/{uid}")
-                elif status_text == "停用帳號":
-                    requests.put(f"{API_URL}/disable_user/{uid}")
-                elif status_text == "啟用帳號":
-                    requests.put(f"{API_URL}/enable_user/{uid}")
-                else:
-                    payload = {
-                        "is_admin": is_admin,
-                        "note": note
+                    st.session_state["user_info"] = {
+                        "id": result.get("id"),
+                        "username": username,
+                        "is_admin": result.get("role", "user") == "admin"
                     }
-                    requests.put(f"{API_URL}/update_user/{uid}", json=payload)
 
-                success_count += 1
+                    st.session_state["current_page"] = "home"
+                    st.rerun()
+                else:
+                    st.error("❌ 帳號或密碼錯誤")
+            except Exception as e:
+                st.error("❌ 系統錯誤，請稍後再試")
+                st.code(str(e))
 
-            st.success(f"✅ 已成功儲存 {success_count} 筆資料變更")
+    with col2:
+        if st.button("註冊"):
+            st.session_state["current_page"] = "register"
             st.rerun()
 
-    with stylable_container("back", css_styles="margin-top: 10px"):
-        if st.button("🔙 返回主頁"):
-            st.session_state["current_page"] = "home"
+# ------------------------
+# 註冊頁面
+# ------------------------
+elif st.session_state["current_page"] == "register":
+    st.title("📝 註冊新帳號")
+    new_user = st.text_input("新帳號")
+    new_pass = st.text_input("新密碼", type="password")
+    company_name = st.text_input("公司名稱（可留空）")
+    identity = st.radio("請選擇身分", ["使用者", "管理員"], horizontal=True)
+    is_admin = identity == "管理員"
+
+    if st.button("註冊"):
+        st.toast("📡 正在送出註冊資料...")
+        payload = {
+            "username": new_user,
+            "password": new_pass,
+            "company_name": company_name,
+            "is_admin": is_admin
+        }
+        try:
+            res = requests.post(f"{API_BASE}/register", json=payload)
+            if res.status_code == 200:
+                st.success("✅ 註冊成功，請回到登入頁")
+            else:
+                st.error(f"❌ 註冊失敗：{res.json().get('message')}")
+        except Exception as e:
+            st.error("❌ 註冊失敗，系統錯誤")
+            st.code(str(e))
+
+    if st.button("返回登入"):
+        st.session_state["current_page"] = "login"
+        st.rerun()
+
+# ------------------------
+# 首頁功能選單（依角色顯示）
+# ------------------------
+elif st.session_state["current_page"] == "home":
+    role = st.session_state.get("role", "user")
+    username = st.session_state.get("username", "")
+    st.success(f"🎉 歡迎 {username}（{role}）")
+
+    if role == "admin":
+        st.info("🛠️ 管理員功能選單")
+        if st.button("👥 帳號管理"):
+            st.session_state["current_page"] = "account_manage"
             st.rerun()
+        if st.button("➕ 新增名片"):
+            st.session_state["current_page"] = "add_card"
+            st.rerun()
+        if st.button("📂 名片清單"):
+            st.session_state["current_page"] = "card_list"
+            st.rerun()
+    else:
+        st.info("📋 使用者功能選單")
+        if st.button("🔐 修改密碼"):
+            st.session_state["current_page"] = "change_password"
+            st.rerun()
+        if st.button("➕ 新增名片"):
+            st.session_state["current_page"] = "add_card"
+            st.rerun()
+        if st.button("📂 名片清單"):
+            st.session_state["current_page"] = "card_list"
+            st.rerun()
+
+# ------------------------
+# 各功能導向
+# ------------------------
+elif st.session_state["current_page"] == "account_manage":
+    import frontend.pages.account_manager as acc_page
+    acc_page.run()
+
+elif st.session_state["current_page"] == "add_card":
+    import frontend.pages.add_card as add_page
+    add_page.run()
+
+elif st.session_state["current_page"] == "card_list":
+    import frontend.pages.card_list as card_page
+    card_page.run()
+
+elif st.session_state["current_page"] == "change_password":
+    import frontend.pages.change_password as change_page
+    change_page.run()
