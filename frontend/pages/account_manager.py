@@ -33,7 +33,7 @@ def process_users(users):
         "note": "備註"
     })
     df["是否為管理員"] = df["是否為管理員"].astype(bool)
-    
+
     # 🔸 設定下拉選單內容
     def status_options(status):
         if status == "啟用中":
@@ -42,7 +42,7 @@ def process_users(users):
             return ["已停用", "啟用帳號", "刪除帳號"]
         else:
             return [status]
-    
+
     df["狀態選項"] = df["狀態"].apply(status_options)
     return df
 
@@ -80,15 +80,6 @@ if df.empty:
 # ✅ 確保狀態選項為 list
 df["狀態選項"] = df["狀態選項"].apply(lambda x: x if isinstance(x, list) else [])
 
-# ✅ 建立 GridOptions
-gb = GridOptionsBuilder.from_dataframe(df)
-gb.configure_column("是否為管理員", editable=True, cellEditor="agCheckboxCellEditor")
-gb.configure_column("備註", editable=True)
-gb.configure_column("狀態", editable=True, cellEditor="agSelectCellEditor", cellEditorParams={"values": []})
-gb.configure_column("狀態選項", hide=True)
-
-gridOptions = gb.build()
-
 # ✅ 自訂 JS：根據每列顯示下拉選單值
 custom_js = JsCode("""
 function(params) {
@@ -102,9 +93,15 @@ function(params) {
     }
 }
 """)
-for col in gridOptions["columnDefs"]:
-    if col["field"] == "狀態":
-        col["cellEditorParams"] = custom_js
+
+# ✅ 建立 GridOptions
+gb = GridOptionsBuilder.from_dataframe(df)
+gb.configure_column("是否為管理員", editable=True, cellEditor="agCheckboxCellEditor")
+gb.configure_column("備註", editable=True)
+gb.configure_column("狀態", editable=True, cellEditor="agSelectCellEditor", cellEditorParams=custom_js)
+gb.configure_column("狀態選項", hide=True)
+
+gridOptions = gb.build()
 
 # ✅ 顯示 AgGrid 表格
 grid_response = AgGrid(
@@ -119,7 +116,7 @@ grid_response = AgGrid(
 
 # ✅ 提交修改按鈕
 with stylable_container("save-btn", css_styles="button {margin-top: 1rem;}"):
-    if st.button("💾 儲存變更"):
+    if st.button("📏 儲存變更"):
         updated_rows = grid_response["data"]
         update_users(updated_rows.to_dict(orient="records"))
         st.success("✅ 已更新帳號資料！")
