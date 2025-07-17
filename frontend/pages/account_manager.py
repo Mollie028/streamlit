@@ -1,13 +1,13 @@
 import streamlit as st
 import requests
 import pandas as pd
-from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
+from st_aggrid import AgGrid, GridOptionsBuilder
 from streamlit_extras.stylable_container import stylable_container
 
 API_URL = "https://ocr-whisper-production-2.up.railway.app"
 
-st.set_page_config(page_title="帳號清單", page_icon="👩‍💼", layout="wide")
-st.markdown("## 👩‍💼 帳號清單")
+st.set_page_config(page_title="帳號管理", page_icon="👩‍💼", layout="wide")
+st.markdown("## 👩‍💼 帳號管理")
 
 # 🧩 限管理員才能進入
 current_user = st.session_state.get("user_info", {})
@@ -25,7 +25,7 @@ def fetch_users():
         st.error(f"無法取得使用者資料：{e}")
         return []
 
-# 🔧 資料轉換與欄位建立
+# 🔧 處理使用者資料
 def process_users(users):
     df = pd.DataFrame(users)
     if df.empty:
@@ -41,91 +41,75 @@ def process_users(users):
     df["是否為管理員"] = df["是否為管理員"].astype(bool)
     df["啟用狀態"] = df["啟用狀態"].astype(bool)
     df["狀態"] = df["啟用狀態"].apply(lambda x: "啟用中" if x else "已停用")
-    df["狀態選項"] = df["狀態"].apply(lambda x: ["停用帳號", "刪除帳號"] if x == "啟用中" else ["啟用帳號", "刪除帳號"])
     return df
 
-# 🚀 主流程
+# 🚀 載入與顯示帳號表格
 users = fetch_users()
 df = process_users(users)
 
 if df.empty:
-    st.info("尚無有效使用者資料，請稍後再試。")
+    st.info("尚無有效使用者資料")
     st.stop()
 
-# 📊 表格欄位設定
-gb = GridOptionsBuilder.from_dataframe(df)
-gb.configure_column("是否為管理員", editable=True, cellEditor="agCheckboxCellEditor")
-gb.configure_column("備註", editable=True)
-gb.configure_column("狀態選項", hide=True)
+col1, col2 = st.columns([2, 1])
 
-# ✅ 動態下拉選單 JS 實作
-cell_editor_js = JsCode("""
-function(params) {
-    if (params.data && params.data['狀態選項']) {
-        return {
-            values: params.data['狀態選項']
-        }
-    }
-    return {
-        values: []
-    }
-}
-""")
+with col1:
+    st.subheader("📋 使用者清單")
+    gb = GridOptionsBuilder.from_dataframe(df)
+    gb.configure_selection("single", use_checkbox=True)
+    gb.configure_column("是否為管理員", editable=False)
+    gb.configure_column("啟用狀態", hide=True)
+    grid_response = AgGrid(
+        df,
+        gridOptions=gb.build(),
+        update_mode="SELECTION_CHANGED",
+        theme="streamlit",
+        height=400,
+        fit_columns_on_grid_load=True
+    )
 
-gb.configure_column(
-    "狀態",
-    editable=True,
-    cellEditor="agSelectCellEditor",
-    cellEditorParams=cell_editor_js
-)
+selected_rows = grid_response["selected_rows"]
 
-# 📋 顯示表格
-grid_response = AgGrid(
-    df,
-    gridOptions=gb.build(),
-    update_mode="MODEL_CHANGED",
-    fit_columns_on_grid_load=True,
-    theme="streamlit",
-    height=400,
-    allow_unsafe_jscode=True
-)
+with col2:
+    st.subheader("⚙️ 帳號操作區")
 
-updated_rows = grid_response["data"].to_dict("records")
+    if not selected_rows:
+        st.info("請點選左側帳號以進行操作")
+    else:
+        selected = selected_rows[0]
+        user_id = selected["使用者ID"]
+        username = selected["帳號名稱"]
+        is_active = selected["啟用狀態"]
 
-# 💾 儲存變更
-with stylable_container("save", css_styles="margin-top: 20px"):
-    if st.button("📄 儲存變更"):
-        success_count = 0
-        for row in updated_rows:
-            uid = row.get("使用者ID")
-            is_admin = row.get("是否為管理員", False)
-            note = row.get("備註", "")
-            status_text = row.get("狀態")
+        st.markdown(f"**帳號 ID：** `{user_id}`")
+        st.markdown(f"**帳號名稱：** `{username}`")
+        st.markdown(f"**目前狀態：** `{'啟用中' if is_active else '已停用'}`")
 
+        actions = []
+        if is_active:
+            actions = ["停用帳號", "刪除帳號"]
+        else:
+            actions = ["啟用帳號", "刪除帳號"]
+
+        action = st.radio("選擇操作動作：", actions, horizontal=True)
+
+        if st.button("✅ 執行操作"):
             try:
-                if status_text == "刪除帳號":
-                    requests.delete(f"{API_URL}/delete_user/{uid}")
-                elif status_text == "停用帳號":
-                    requests.put(f"{API_URL}/disable_user/{uid}")
-                elif status_text == "啟用帳號":
-                    requests.put(f"{API_URL}/enable_user/{uid}")
-                else:
-                    payload = {"is_admin": is_admin, "note": note}
-                    requests.put(f"{API_URL}/update_user/{uid}", json=payload)
-                success_count += 1
-            except:
-                st.error(f"❌ 帳號 ID {uid} 更新失敗")
-
-        st.success(f"✅ 已成功儲存 {success_count} 筆資料變更")
-        st.session_state["current_page"] = "account_manage"
-        st.rerun()
+                if action == "啟用帳號":
+                    requests.put(f"{API_URL}/enable_user/{user_id}")
+                    st.success("帳號已啟用")
+                elif action == "停用帳號":
+                    requests.put(f"{API_URL}/disable_user/{user_id}")
+                    st.success("帳號已停用")
+                elif action == "刪除帳號":
+                    requests.delete(f"{API_URL}/delete_user/{user_id}")
+                    st.success("帳號已刪除")
+                st.rerun()
+            except Exception as e:
+                st.error(f"執行失敗：{e}")
 
 # 🔙 返回主頁
-with stylable_container("back", css_styles="margin-top: 10px"):
+with stylable_container("back", css_styles="margin-top: 20px"):
     if st.button("🔙 返回主頁"):
         st.session_state["current_page"] = "home"
         st.rerun()
-
-# ✅ run() 支援 app.py 呼叫
-def run():
-    pass
