@@ -1,5 +1,5 @@
 import streamlit as st
-from st_aggrid import AgGrid, GridOptionsBuilder
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 import requests
 import pandas as pd
 
@@ -40,32 +40,29 @@ def run():
         gb.configure_column("是否為管理員", editable=False)
         gb.configure_column("帳號名稱", editable=False)
         gb.configure_column("使用者ID", editable=False)
-        gb.configure_column("備註", editable=False)
-
-        grid_options = gb.build()
-        grid_options["rowSelection"] = "single"
 
         grid_response = AgGrid(
             df,
-            gridOptions=grid_options,
-            update_mode="SELECTION_CHANGED",
-            height=380,  # ✅ 固定表格高度，避免空白太大
+            gridOptions=gb.build(),
+            update_mode=GridUpdateMode.SELECTION_CHANGED,
+            height=520,  # 🔼 表格高度加大
+            width='100%',
             theme="streamlit"
         )
 
     # ✅ 顯示選取帳號詳細資訊與操作選單
-    selected_rows = grid_response.get("selected_rows", [])
-    if isinstance(selected_rows, list) and len(selected_rows) > 0:
-        selected = selected_rows[0]  # ✅ 保留 dict，不轉成 DataFrame，避免 pandas 的錯誤
+    selected_rows = grid_response["selected_rows"]
+    if selected_rows and len(selected_rows) > 0:
+        selected = selected_rows[0]  # 🔧 修正 crash，直接使用 dict 而非轉 DataFrame
 
         with col2:
             st.subheader("🔧 帳號操作")
-            st.write(f"👤 帳號：{selected.get('帳號名稱', '')}")
-            st.write(f"🆔 ID：{selected.get('使用者ID', '')}")
-            st.write(f"🔒 狀態：{selected.get('啟用狀態', '')}")
+            st.write(f"👤 帳號：{selected['帳號名稱']}")
+            st.write(f"🆔 ID：{selected['使用者ID']}")
+            st.write(f"🔒 狀態：{selected['啟用狀態']}")
 
-            current_status = selected.get("啟用狀態")
-            user_id = selected.get("使用者ID")
+            current_status = selected["啟用狀態"]
+            user_id = selected["使用者ID"]
 
             # ✅ 根據目前狀態提供操作選單
             if current_status == "啟用中":
