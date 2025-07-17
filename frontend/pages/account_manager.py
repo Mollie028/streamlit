@@ -41,7 +41,7 @@ def process_users(users):
     df["是否為管理員"] = df["是否為管理員"].astype(bool)
     df["啟用狀態"] = df["啟用狀態"].astype(bool)
     df["狀態"] = df["啟用狀態"].apply(lambda x: "啟用中" if x else "已停用")
-    df["狀態選項"] = df["狀態"].apply(lambda x: ["停用帳號", "刪除帳號"] if x == "啟用中" else ["啟用帳號", "刪除帳號"])
+    df["狀態選項"] = df["啟用狀態"].apply(lambda x: ["停用帳號", "刪除帳號"] if x else ["啟用帳號", "刪除帳號"])
     return df
 
 # 🚀 主流程
@@ -57,11 +57,16 @@ gb = GridOptionsBuilder.from_dataframe(df)
 gb.configure_column("是否為管理員", editable=True, cellEditor="agCheckboxCellEditor")
 gb.configure_column("備註", editable=True)
 
-# ⬆️ 加入動態下拉選單
 cell_editor_params = JsCode("""
 function(params) {
-    return {
-        values: params.data["狀態選項"]
+    if (params.data && params.data['狀態選項']) {
+        return {
+            values: params.data['狀態選項']
+        }
+    } else {
+        return {
+            values: ['啟用帳號', '停用帳號', '刪除帳號']
+        }
     }
 }
 """)
@@ -80,11 +85,13 @@ grid_response = AgGrid(
     allow_unsafe_jscode=True
 )
 
-# 📄 取出更新資料
 updated_rows = grid_response["data"].to_dict("records")
 for row in updated_rows:
     if "狀態選項" not in row or not isinstance(row["狀態選項"], list):
-        row["狀態選項"] = ["啟用帳號", "停用帳號", "刪除帳號"]
+        if row.get("狀態") == "啟用中":
+            row["狀態選項"] = ["停用帳號", "刪除帳號"]
+        else:
+            row["狀態選項"] = ["啟用帳號", "刪除帳號"]
 
 # 📅 儲存更動
 with stylable_container("save", css_styles="margin-top: 20px"):
@@ -104,7 +111,6 @@ with stylable_container("save", css_styles="margin-top: 20px"):
                 elif status_text == "啟用帳號":
                     requests.put(f"{API_URL}/enable_user/{uid}")
 
-                # 如果有備註或 admin 變更
                 payload = {"is_admin": is_admin, "note": note}
                 requests.put(f"{API_URL}/update_user/{uid}", json=payload)
 
@@ -122,6 +128,6 @@ with stylable_container("back", css_styles="margin-top: 10px"):
         st.session_state["current_page"] = "home"
         st.rerun()
 
-# ✅ run() 函數供 app.py 呼叫，不再 rerun
+# ✅ run() 函數供 app.py 呼叫
 def run():
     pass
