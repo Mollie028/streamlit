@@ -82,6 +82,3 @@ def run():
                     st.success("✅ 操作成功，請重新整理頁面")
                 else:
                     st.error(f"❌ 操作失敗：{res.text}")
-# ✅ run() 支援 app.py 呼叫
-def run():
-    pass
