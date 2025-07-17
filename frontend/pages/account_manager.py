@@ -4,120 +4,121 @@ import pandas as pd
 from st_aggrid import AgGrid, GridOptionsBuilder
 from streamlit_extras.stylable_container import stylable_container
 
-# 網站基礎 URL
 API_URL = "https://ocr-whisper-production-2.up.railway.app"
 
-st.set_page_config(page_title="帳號清單", page_icon="👩‍💼", layout="wide")
-st.markdown("## 👩‍💼 帳號清單")
-
-# 抓取使用者資料
+# 🧩 呼叫 API 拿帳號資料
 def fetch_users():
     try:
         res = requests.get(f"{API_URL}/users")
         res.raise_for_status()
         return res.json()
     except Exception as e:
-        st.error(f"無法抓取使用者資料：{e}")
+        st.error(f"❌ 取得帳號資料失敗：{e}")
         return []
 
-# 處理資料
+# 🧩 資料轉換成 DataFrame 並加上「狀態選項」
 def process_users(users):
     df = pd.DataFrame(users)
     if df.empty:
         return df
 
+    # 欄位名稱轉換
     df = df.rename(columns={
         "id": "使用者ID",
         "username": "帳號名稱",
-        "company_name": "公司名稱",
+        "company": "公司名稱",
         "is_admin": "是否為管理員",
-        "is_active": "啟用狀態",
+        "is_active": "啟用中",
         "note": "備註"
     })
-    df["是否為管理員"] = df["是否為管理員"].astype(bool)
-    df["啟用狀態"] = df["啟用狀態"].astype(bool)
 
-    # 增加 "狀態" 變數顯示
-    df["狀態"] = df["啟用狀態"].apply(lambda x: "啟用中" if x else "已停用")
+    # 加上狀態欄位與下拉選單選項
+    def compute_status(row):
+        return "啟用中" if row["啟用中"] else "已停用"
 
-    # 增加狀態下拉選項（加入動態狀態變化）
-    def get_options(val):
-        return ["啟用中", "停用帳號", "刪除帳號"] if val else ["已停用", "啟用帳號", "刪除帳號"]
+    def get_status_options(status):
+        return ["停用帳號", "刪除帳號"] if status == "啟用中" else ["啟用帳號", "刪除帳號"]
 
-    df["狀態選項"] = df["啟用狀態"].apply(get_options)
+    df["狀態"] = df.apply(compute_status, axis=1)
+    df["狀態選項"] = df["狀態"].apply(get_status_options)
 
     return df
 
-# 登記使用者
-current_user = st.session_state.get("user_info", {})
-is_admin = current_user.get("is_admin", False)
-current_user_id = current_user.get("id")
+# 🧩 將修改後的帳號資料送出
+def update_users(changes):
+    success_count = 0
+    for row in changes:
+        uid = row.get("使用者ID")
+        status = row.get("狀態")
+        note = row.get("備註")
+        is_admin = row.get("是否為管理員")
 
-# 預防非管理者試圖進入
-if not is_admin:
-    st.warning("此頁面僅限管理員使用")
-    st.stop()
-
-users = fetch_users()
-df = process_users(users)
-
-if df.empty:
-    st.info("還沒有任何使用者資料")
-    st.stop()
-
-# 建立 AgGrid 設定
-gb = GridOptionsBuilder.from_dataframe(df)
-gb.configure_column("是否為管理員", editable=True, cellEditor="agCheckboxCellEditor")
-gb.configure_column("備註", editable=True)
-gb.configure_column("狀態", editable=True, cellEditor="agSelectCellEditor",
-                    cellEditorParams={"values": df["狀態選項"].iloc[0]})  # 先定定值，後續可以加入 JsCode 做變化
-
-gb.configure_column("狀態選項", hide=True)  # 不顯示
-
-grid = AgGrid(
-    df,
-    gridOptions=gb.build(),
-    update_mode="MODEL_CHANGED",
-    fit_columns_on_grid_load=True,
-    theme="streamlit",
-    height=400,
-    allow_unsafe_jscode=True
-)
-
-updated_rows = grid["data"].to_dict("records")
-
-# 採用 button 檢查並送出編輯資料
-with stylable_container("save", css_styles="margin-top: 20px"):
-    if st.button("📄 儲存變更"):
-        success_count = 0
-        for row in updated_rows:
-            uid = row.get("\u4f7f\u7528\u8005ID")
-            is_admin = row.get("\u662f\u5426\u70ba\u7ba1\u7406\u54e1", False)
-            note = row.get("\u5099\u8a3b", "")
-            status_text = row.get("\u72c0\u614b")
-
-            # 變更狀態
-            if status_text == "刪除帳號":
-                requests.delete(f"{API_URL}/delete_user/{uid}")
-            elif status_text == "停用帳號":
+        try:
+            if status == "停用帳號":
                 requests.put(f"{API_URL}/disable_user/{uid}")
-            elif status_text == "啟用帳號":
+            elif status == "啟用帳號":
                 requests.put(f"{API_URL}/enable_user/{uid}")
+            elif status == "刪除帳號":
+                requests.delete(f"{API_URL}/delete_user/{uid}")
             else:
-                # 修改備註和管理設定
-                payload = {
-                    "is_admin": is_admin,
-                    "note": note
-                }
+                payload = {"note": note, "is_admin": is_admin}
                 requests.put(f"{API_URL}/update_user/{uid}", json=payload)
-
             success_count += 1
+        except Exception as e:
+            st.error(f"❌ 更新使用者 {uid} 時發生錯誤：{e}")
 
-        st.success(f"✅ 已成功儲存 {success_count} 筆資料變更")
-        st.rerun()
+    if success_count:
+        st.success(f"✅ 已成功儲存 {success_count} 筆變更！")
 
-# 返回主頁
-with stylable_container("back", css_styles="margin-top: 10px"):
-    if st.button("🔙 返回主頁"):
-        st.session_state["current_page"] = "home"
-        st.rerun()
+# ✅ 主函式：整個畫面都放這裡
+def run():
+    st.markdown("## 👩‍💼 帳號清單")
+
+    users = fetch_users()
+    df = process_users(users)
+
+    if df.empty:
+        st.warning("⚠️ 尚無有效使用者資料，請稍後再試。")
+        return
+
+    # ✅ AgGrid 設定
+    gb = GridOptionsBuilder.from_dataframe(df)
+    gb.configure_pagination()
+    gb.configure_default_column(editable=False, wrapText=True, autoHeight=True)
+    gb.configure_column("是否為管理員", editable=True, cellEditor="agCheckboxCellEditor")
+    gb.configure_column("備註", editable=True)
+    gb.configure_column("狀態", editable=True, cellEditor="agSelectCellEditor", cellEditorParams={"values": []})
+    gb.configure_column("狀態選項", hide=True)
+
+    gridOptions = gb.build()
+
+    # ✅ 手動設定每列的「狀態選項」作為 cellEditor 下拉值
+    for col in gridOptions["columnDefs"]:
+        if col["field"] == "狀態":
+            col["cellEditorParams"] = {
+                "function": "params => ({ values: params.data['狀態選項'] || [] })"
+            }
+
+    # ✅ 顯示表格
+    grid_return = AgGrid(
+        df,
+        gridOptions=gridOptions,
+        allow_unsafe_jscode=True,
+        theme="streamlit",
+        update_mode="MODEL_CHANGED",
+        fit_columns_on_grid_load=True,
+        height=450,
+    )
+
+    # ✅ 儲存變更按鈕
+    with stylable_container("save-btn", css_styles="button {margin-top: 1rem;}"):
+        if st.button("💾 儲存變更"):
+            updated = grid_return["data"]
+            update_users(updated.to_dict("records"))
+            st.experimental_rerun()
+
+    # ✅ 返回主頁
+    with stylable_container("back-btn", css_styles="button {margin-top: 1rem;}"):
+        if st.button("🔙 返回主頁"):
+            st.session_state["current_page"] = "home"
+            st.rerun()
