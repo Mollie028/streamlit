@@ -1,12 +1,19 @@
 import streamlit as st
 import requests
+import pandas as pd
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-from frontend.components import go_home_button
 from core.config import API_BASE
 
-st.set_page_config(page_title="帳號管理", layout="wide")
+# 🔧 內建返回主頁按鈕（避免 import error）
+def go_home_button():
+    st.markdown("""
+        <div style="margin-bottom: 20px;">
+            <a href="/"><button style="padding:6px 12px;font-size:14px;">🏠 返回主頁</button></a>
+        </div>
+    """, unsafe_allow_html=True)
 
-# 權限驗證（僅限管理員）
+# ✅ 設定頁面與權限檢查
+st.set_page_config(page_title="帳號管理", layout="wide")
 if not st.session_state.get("access_token") or st.session_state.get("role") != "admin":
     st.error("⚠️ 請先登入")
     st.stop()
@@ -14,7 +21,7 @@ if not st.session_state.get("access_token") or st.session_state.get("role") != "
 st.title("👤 帳號管理")
 go_home_button()
 
-# 取得使用者清單
+# ✅ 取得使用者清單
 try:
     res = requests.get(f"{API_BASE}/users", headers={
         "Authorization": f"Bearer {st.session_state['access_token']}"
@@ -29,15 +36,12 @@ except Exception as e:
     st.code(str(e))
     st.stop()
 
-# 將資料轉為 DataFrame 格式
-import pandas as pd
-
+# ✅ 資料轉換為 DataFrame 並處理欄位
 df = pd.DataFrame(users)
 if df.empty:
     st.warning("⚠️ 尚無使用者資料")
     st.stop()
 
-# 欄位顯示與重新命名
 df = df.rename(columns={
     "id": "ID",
     "username": "帳號",
@@ -49,7 +53,7 @@ df = df.rename(columns={
 df["啟用中"] = df["啟用中"].map({True: "啟用", False: "停用"})
 df["權限"] = df["權限"].map({"admin": "管理員", "user": "使用者"})
 
-# 建立可編輯表格
+# ✅ 建立 AgGrid 表格（可編輯＋多選）
 gb = GridOptionsBuilder.from_dataframe(df)
 gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
 gb.configure_default_column(editable=True, wrapText=True, autoHeight=True)
@@ -60,7 +64,6 @@ gb.configure_column("權限", cellEditor="agSelectCellEditor", cellEditorParams=
 grid_options = gb.build()
 
 st.markdown("### 👇 使用者清單（可編輯）")
-
 grid = AgGrid(
     df,
     gridOptions=grid_options,
@@ -73,7 +76,7 @@ grid = AgGrid(
 updated_rows = grid["data"]
 selected_rows = grid["selected_rows"]
 
-# 儲存按鈕
+# ✅ 儲存變更按鈕
 if st.button("💾 儲存變更"):
     headers = {"Authorization": f"Bearer {st.session_state['access_token']}"}
     for row in selected_rows:
