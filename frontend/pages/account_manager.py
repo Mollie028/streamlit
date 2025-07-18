@@ -4,24 +4,29 @@ import pandas as pd
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from core.config import API_BASE
 
-# 🔧 內建返回主頁按鈕（避免 import error）
+# ✅ 手動寫一個 go_home_button（避免匯入錯誤）
 def go_home_button():
-    st.markdown("""
-        <div style="margin-bottom: 20px;">
-            <a href="/"><button style="padding:6px 12px;font-size:14px;">🏠 返回主頁</button></a>
+    st.markdown(
+        """
+        <div style='text-align: right; margin-bottom: 10px;'>
+            <a href="/" style='text-decoration: none;'>
+                <button style='padding: 6px 16px; font-size: 14px;'>🏠 返回主頁</button>
+            </a>
         </div>
-    """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True
+    )
 
-# ✅ 設定頁面與權限檢查
-st.set_page_config(page_title="帳號管理", layout="wide")
-if not st.session_state.get("access_token") or st.session_state.get("role") != "admin":
-    st.error("⚠️ 請先登入")
+# ✅ 僅限管理員
+if "access_token" not in st.session_state or st.session_state.get("role") != "admin":
+    st.error("⚠️ 請先登入管理員帳號")
     st.stop()
 
+st.set_page_config(page_title="帳號管理", layout="wide")
 st.title("👤 帳號管理")
 go_home_button()
 
-# ✅ 取得使用者清單
+# ✅ 抓取使用者清單
 try:
     res = requests.get(f"{API_BASE}/users", headers={
         "Authorization": f"Bearer {st.session_state['access_token']}"
@@ -36,64 +41,79 @@ except Exception as e:
     st.code(str(e))
     st.stop()
 
-# ✅ 資料轉換為 DataFrame 並處理欄位
+# ✅ 建立 DataFrame
 df = pd.DataFrame(users)
 if df.empty:
     st.warning("⚠️ 尚無使用者資料")
     st.stop()
 
-df = df.rename(columns={
+# ✅ 欄位重新命名 + 安全轉換
+rename_map = {
     "id": "ID",
     "username": "帳號",
     "company_name": "公司",
     "note": "備註",
     "is_active": "啟用中",
     "role": "權限"
-})
-df["啟用中"] = df["啟用中"].map({True: "啟用", False: "停用"})
-df["權限"] = df["權限"].map({"admin": "管理員", "user": "使用者"})
+}
+df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns})
 
-# ✅ 建立 AgGrid 表格（可編輯＋多選）
+# ✅ 避免欄位缺失報錯
+if "啟用中" in df.columns:
+    df["啟用中"] = df["啟用中"].map({True: "啟用", False: "停用"})
+
+if "權限" in df.columns:
+    df["權限"] = df["權限"].map({"admin": "管理員", "user": "使用者"})
+
+# ✅ 設定 AgGrid 表格
 gb = GridOptionsBuilder.from_dataframe(df)
 gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
-gb.configure_default_column(editable=True, wrapText=True, autoHeight=True)
+gb.configure_default_column(editable=True, wrapText=True, autoHeight=True, resizable=True)
 gb.configure_selection(selection_mode="multiple", use_checkbox=True)
 gb.configure_column("ID", editable=False)
-gb.configure_column("啟用中", cellEditor="agSelectCellEditor", cellEditorParams={"values": ["啟用", "停用"]})
-gb.configure_column("權限", cellEditor="agSelectCellEditor", cellEditorParams={"values": ["管理員", "使用者"]})
+if "啟用中" in df.columns:
+    gb.configure_column("啟用中", cellEditor="agSelectCellEditor", cellEditorParams={"values": ["啟用", "停用"]})
+if "權限" in df.columns:
+    gb.configure_column("權限", cellEditor="agSelectCellEditor", cellEditorParams={"values": ["管理員", "使用者"]})
 grid_options = gb.build()
 
 st.markdown("### 👇 使用者清單（可編輯）")
+
 grid = AgGrid(
     df,
     gridOptions=grid_options,
     update_mode=GridUpdateMode.MANUAL,
     fit_columns_on_grid_load=True,
-    height=380,
+    height=500,
     theme="streamlit"
 )
 
 updated_rows = grid["data"]
 selected_rows = grid["selected_rows"]
 
-# ✅ 儲存變更按鈕
+# ✅ 儲存按鈕
 if st.button("💾 儲存變更"):
+    if not selected_rows:
+        st.warning("⚠️ 請至少選取一筆帳號資料")
+        st.stop()
+
     headers = {"Authorization": f"Bearer {st.session_state['access_token']}"}
     for row in selected_rows:
         user_id = row["ID"]
-        payload = {
-            "username": row["帳號"],
-            "company_name": row["公司"],
-            "note": row["備註"],
-            "is_active": row["啟用中"] == "啟用",
-            "role": "admin" if row["權限"] == "管理員" else "user"
-        }
         try:
+            payload = {
+                "username": row.get("帳號", ""),
+                "company_name": row.get("公司", ""),
+                "note": row.get("備註", ""),
+                "is_active": row.get("啟用中") == "啟用",
+                "role": "admin" if row.get("權限") == "管理員" else "user"
+            }
             res = requests.put(f"{API_BASE}/update_user/{user_id}", json=payload, headers=headers)
             if res.status_code != 200:
                 st.warning(f"❗ 帳號 {row['帳號']} 更新失敗：{res.text}")
         except Exception as e:
-            st.error(f"❌ 帳號 {row['帳號']} 更新錯誤")
+            st.error(f"❌ 帳號 {row.get('帳號')} 發生錯誤")
             st.code(str(e))
+
     st.success("✅ 所有變更已儲存")
     st.rerun()
