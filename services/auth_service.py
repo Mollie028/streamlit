@@ -63,6 +63,6 @@ def is_logged_in():
 
 # ✅ 登出按鈕
 def logout_button():
-    if st.button("🔓 登出"):
+    if st.button("🔓 登出", key="logout_button"):
         st.session_state.clear()
         st.rerun()
