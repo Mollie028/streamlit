@@ -1,12 +1,13 @@
 import sys
 import os
+
+# ✅ 加入 streamlit 根目錄到 Python 搜尋路徑
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 import streamlit as st
 import requests
 from core.config import API_BASE
-from frontend.services.auth_service import is_logged_in, logout_button
-
+from services.auth_service import is_logged_in, logout_button  # ✅ 改這裡！
 
 def run():
     # ===================== ☁️ 登入狀態區塊 =====================
