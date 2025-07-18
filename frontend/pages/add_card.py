@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 from core.config import API_BASE
-from components.auth import is_logged_in, logout_button
+from frontend.services.auth_service import is_logged_in, logout_button  # ✅ 修正這行
 
 # ===================== ☁️ 登入狀態區塊 =====================
 if not is_logged_in():
