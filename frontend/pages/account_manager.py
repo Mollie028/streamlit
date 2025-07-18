@@ -2,115 +2,129 @@ import streamlit as st
 import requests
 import pandas as pd
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-from streamlit_extras.stylable_container import stylable_container
+from core.config import API_BASE
 
-API_BASE = "https://ocr-whisper-production-2.up.railway.app"
+# ✅ 手動寫一個 go_home_button（避免匯入錯誤）
+def go_home_button():
+    st.markdown(
+        """
+        <div style='text-align: right; margin-bottom: 10px;'>
+            <a href="/" style='text-decoration: none;'>
+                <button style='padding: 6px 16px; font-size: 14px;'>🏠 返回主頁</button>
+            </a>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+# ✅ 僅限管理員
+if "access_token" not in st.session_state or st.session_state.get("role") != "admin":
+    st.error("⚠️ 請先登入管理員帳號")
+    st.stop()
 
 def run():
-    st.title("🛠️ 帳號管理頁")
+    st.set_page_config(page_title="帳號管理", layout="wide")
+    st.title("👤 帳號管理")
+    go_home_button()
 
-    headers = {"Authorization": f"Bearer {st.session_state['access_token']}"}
-    res = requests.get(f"{API_BASE}/users", headers=headers)
-    data = res.json()
-
-    if not isinstance(data, list):
-        st.error("❌ 取得使用者資料失敗")
+    # ✅ 抓取使用者清單
+    try:
+        res = requests.get(f"{API_BASE}/users", headers={
+            "Authorization": f"Bearer {st.session_state['access_token']}"
+        })
+        if res.status_code == 200:
+            data = res.json()
+        else:
+            st.error("🚫 無法取得使用者清單")
+            return
+    except Exception as e:
+        st.error("❌ 錯誤")
+        st.code(str(e))
         return
 
     df = pd.DataFrame(data)
-
     if df.empty:
         st.info("目前沒有帳號資料")
         return
 
-    # 欄位映射
-    df["啟用中"] = df["is_active"].map({True: "啟用", False: "停用"})
-    df["權限"] = df["role"].map({"admin": "管理員", "user": "使用者"})
-    df.rename(columns={"id": "ID", "username": "帳號", "company_name": "公司", "note": "備註"}, inplace=True)
+    # ✅ 欄位轉換（避免缺欄位錯誤）
+    rename_map = {
+        "id": "ID",
+        "username": "帳號",
+        "company_name": "公司",
+        "note": "備註",
+        "is_active": "啟用中"
+    }
+    df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns}, inplace=True)
 
-    # 檢查是否有 ID 重複
-    duplicate_ids = df["ID"][df["ID"].duplicated()].unique()
-    if len(duplicate_ids) > 0:
-        st.warning(f"⚠️ 偵測到重複 ID：{', '.join(map(str, duplicate_ids))}，系統將使用帳號 (username) 作為唯一識別。")
+    # ✅ 權限欄位處理（穩定寫法）
+    if "role" in df.columns:
+        df["權限"] = df["role"].map({"admin": "管理員", "user": "使用者"})
+    else:
+        st.warning("⚠️ 缺少 role 欄位，請確認後端 /users API 是否正確")
+        return
 
-    st.subheader("🔧 批次操作（先勾選帳號）")
-    batch_status = st.selectbox("批次變更啟用狀態", ["-- 不變更 --", "啟用", "停用"])
-    batch_role = st.selectbox("批次變更權限", ["-- 不變更 --", "管理員", "使用者"])
+    if "啟用中" in df.columns:
+        df["啟用中"] = df["啟用中"].map({True: "啟用", False: "停用"})
 
-    st.subheader("📋 使用者清單（可編輯）")
-
+    # ✅ AgGrid 設定
     gb = GridOptionsBuilder.from_dataframe(df)
-    gb.configure_selection("multiple", use_checkbox=True)
-    gb.configure_column("帳號", header_name="帳號", editable=False)
-    gb.configure_column("ID", editable=False, hide=True)
-    gb.configure_column("is_admin", hide=True)
-    gb.configure_column("is_active", hide=True)
-    gb.configure_column("role", hide=True)
-    gb.configure_column("公司", editable=True)
-    gb.configure_column("啟用中", editable=True, cellEditor="agSelectCellEditor", cellEditorParams={"values": ["啟用", "停用"]})
-    gb.configure_column("權限", editable=True, cellEditor="agSelectCellEditor", cellEditorParams={"values": ["管理員", "使用者"]})
-    gb.configure_column("備註", editable=True)
     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
+    gb.configure_default_column(editable=True, wrapText=True, autoHeight=True, resizable=True)
+    gb.configure_selection(selection_mode="multiple", use_checkbox=True)
+    gb.configure_column("ID", editable=False)
+    if "啟用中" in df.columns:
+        gb.configure_column("啟用中", cellEditor="agSelectCellEditor", cellEditorParams={"values": ["啟用", "停用"]})
+    if "權限" in df.columns:
+        gb.configure_column("權限", cellEditor="agSelectCellEditor", cellEditorParams={"values": ["管理員", "使用者"]})
     grid_options = gb.build()
 
-    grid_response = AgGrid(
+    st.markdown("### 👇 使用者清單（可編輯）")
+
+    grid = AgGrid(
         df,
         gridOptions=grid_options,
         update_mode=GridUpdateMode.MANUAL,
-        height=380,
-        width="100%",
-        theme="balham",
         fit_columns_on_grid_load=True,
-        allow_unsafe_jscode=True
+        height=500,
+        theme="streamlit"
     )
 
-    selected_rows = grid_response["selected_rows"]
+    updated_rows = grid["data"]
+    selected_rows = grid["selected_rows"]
 
-    st.divider()
-    col1, col2 = st.columns([1, 5])
-    with col1:
-        if st.button("💾 儲存變更", use_container_width=True):
-            if not selected_rows:
-                st.warning("⚠️ 請至少選取一筆帳號資料")
-            else:
-                success = True
-                username_to_id = dict(zip(df["帳號"], df["ID"]))
+    # ✅ 儲存按鈕
+    if st.button("💾 儲存變更"):
+        # ✅ 改為根據「修改欄位差異」自動檢查，而非靠選取
+        if not updated_rows:
+            st.warning("⚠️ 沒有任何變更資料")
+            return
 
-                for row in selected_rows:
-                    username = row.get("帳號")
-                    user_id = username_to_id.get(username)
-                    if not user_id:
-                        st.warning(f"❗ 找不到帳號 {username} 對應的 ID，略過")
-                        continue
+        headers = {"Authorization": f"Bearer {st.session_state['access_token']}"}
 
-                    try:
-                        if batch_status != "-- 不變更 --":
-                            row["啟用中"] = batch_status
-                        if batch_role != "-- 不變更 --":
-                            row["權限"] = batch_role
+        success_count = 0
+        for row in updated_rows:
+            user_id = row.get("ID")
+            if not user_id:
+                continue
 
-                        payload = {
-                            "username": username,
-                            "company_name": row.get("公司", ""),
-                            "note": row.get("備註", ""),
-                            "is_active": row.get("啟用中") == "啟用",
-                            "role": "admin" if row.get("權限") == "管理員" else "user"
-                        }
+            payload = {
+                "username": row.get("帳號", ""),
+                "company_name": row.get("公司", ""),
+                "note": row.get("備註", ""),
+                "is_active": row.get("啟用中") == "啟用",
+                "role": "admin" if row.get("權限") == "管理員" else "user"
+            }
 
-                        res = requests.put(f"{API_BASE}/update_user/{user_id}", json=payload, headers=headers)
-                        if res.status_code != 200:
-                            st.warning(f"❗ 帳號 {username} 更新失敗：{res.text}")
-                            success = False
-                    except Exception as e:
-                        st.error(f"❌ 帳號 {username} 發生錯誤")
-                        st.code(str(e))
-                        success = False
+            try:
+                res = requests.put(f"{API_BASE}/update_user/{user_id}", json=payload, headers=headers)
+                if res.status_code == 200:
+                    success_count += 1
+                else:
+                    st.warning(f"❗ 帳號 {row.get('帳號')} 更新失敗：{res.text}")
+            except Exception as e:
+                st.error(f"❌ 帳號 {row.get('帳號')} 發生錯誤")
+                st.code(str(e))
 
-                if success:
-                    st.success("✅ 所有變更已儲存")
-                    st.rerun()
-
-    with col2:
-        st.info("⬅ 請選擇要編輯的帳號，再按下左側按鈕儲存變更")
-
-    st.markdown("### 🏠 [返回主頁](./)")
+        st.success(f"✅ 成功儲存 {success_count} 筆變更")
+        st.rerun()
