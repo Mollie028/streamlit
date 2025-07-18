@@ -4,7 +4,7 @@ import pandas as pd
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from core.config import API_BASE
 
-# ✅ 手動寫一個 go_home_button（避免匯入錯誤）
+# ✅ 手動 go_home_button
 def go_home_button():
     st.markdown(
         """
@@ -48,7 +48,6 @@ def run():
         st.warning("⚠️ 尚無使用者資料")
         st.stop()
 
-    # ✅ 欄位重新命名 + 安全轉換
     rename_map = {
         "id": "ID",
         "username": "帳號",
@@ -61,10 +60,19 @@ def run():
 
     if "啟用中" in df.columns:
         df["啟用中"] = df["啟用中"].map({True: "啟用", False: "停用"})
+
     if "權限" in df.columns:
         df["權限"] = df["權限"].map({"admin": "管理員", "user": "使用者"})
 
-    # ✅ 設定 AgGrid 表格
+    # ✅ 批次操作選單
+    st.markdown("### 🔧 批次操作（先勾選帳號）")
+    col1, col2 = st.columns(2)
+    with col1:
+        batch_status = st.selectbox("批次變更啟用狀態", ["-- 不變更 --", "啟用", "停用"])
+    with col2:
+        batch_role = st.selectbox("批次變更權限", ["-- 不變更 --", "管理員", "使用者"])
+
+    # ✅ AgGrid 表格
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
     gb.configure_default_column(editable=True, wrapText=True, autoHeight=True, resizable=True)
@@ -77,17 +85,16 @@ def run():
     grid_options = gb.build()
 
     st.markdown("### 👇 使用者清單（可編輯）")
-
     grid = AgGrid(
         df,
         gridOptions=grid_options,
         update_mode=GridUpdateMode.MANUAL,
         fit_columns_on_grid_load=True,
-        height=500,
+        height=400,
         theme="streamlit"
     )
 
-    updated_rows = grid["data"]
+    updated_df = grid["data"]
     selected_rows = grid["selected_rows"]
 
     # ✅ 儲存按鈕
@@ -97,9 +104,16 @@ def run():
             st.stop()
 
         headers = {"Authorization": f"Bearer {st.session_state['access_token']}"}
+
         for row in selected_rows:
             user_id = row["ID"]
             try:
+                # ✅ 套用批次操作設定（如果有）
+                if batch_status != "-- 不變更 --":
+                    row["啟用中"] = batch_status
+                if batch_role != "-- 不變更 --":
+                    row["權限"] = batch_role
+
                 payload = {
                     "username": row.get("帳號", ""),
                     "company_name": row.get("公司", ""),
@@ -107,6 +121,7 @@ def run():
                     "is_active": row.get("啟用中") == "啟用",
                     "role": "admin" if row.get("權限") == "管理員" else "user"
                 }
+
                 res = requests.put(f"{API_BASE}/update_user/{user_id}", json=payload, headers=headers)
                 if res.status_code != 200:
                     st.warning(f"❗ 帳號 {row['帳號']} 更新失敗：{res.text}")
