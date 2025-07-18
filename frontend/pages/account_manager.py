@@ -22,6 +22,7 @@ if "access_token" not in st.session_state or st.session_state.get("role") != "ad
     st.error("⚠️ 請先登入管理員帳號")
     st.stop()
 
+def run():
 st.set_page_config(page_title="帳號管理", layout="wide")
 st.title("👤 帳號管理")
 go_home_button()
