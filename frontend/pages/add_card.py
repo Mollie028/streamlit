@@ -9,6 +9,7 @@ import requests
 from core.config import API_BASE
 from services.auth_service import is_logged_in, logout_button
 
+
 def run():
     # ☁️ 登入狀態區塊
     if not is_logged_in():
@@ -32,47 +33,65 @@ def run():
     if st.button("🚀 開始辨識"):
         if not image_file:
             st.warning("請上傳名片圖片")
-        else:
-            with st.spinner("辨識中，請稍候..."):
+            return
 
-                # 傳送圖片與語音到後端，正確包裝檔案格式
-                files = {
-                    "image": (image_file.name, image_file, image_file.type),
-                }
-                if audio_file:
-                    files["audio"] = (audio_file.name, audio_file, audio_file.type)
+        with st.spinner("辨識中，請稍候..."):
 
+            ocr_text = None
+            voice_text = None
+
+            # ✅ 傳送圖片到 /ocr
+            try:
+                ocr_res = requests.post(
+                    f"{API_BASE}/ocr",
+                    files={"image": (image_file.name, image_file, image_file.type)},
+                    headers={"Authorization": f"Bearer {st.session_state['access_token']}"}
+                )
+                if ocr_res.status_code == 200:
+                    ocr_text = ocr_res.json()
+                else:
+                    st.error("❌ 圖片辨識失敗")
+                    st.code(ocr_res.text)
+            except Exception as e:
+                st.error("❌ 傳送圖片錯誤")
+                st.code(str(e))
+
+            # ✅ 傳送語音到 /whisper（如果有）
+            if audio_file:
                 try:
-                    res = requests.post(
-                        f"{API_BASE}/ocr_whisper",
-                        files=files,
+                    whisper_res = requests.post(
+                        f"{API_BASE}/whisper",
+                        files={"audio": (audio_file.name, audio_file, audio_file.type)},
                         headers={"Authorization": f"Bearer {st.session_state['access_token']}"}
                     )
-                    try:
-                        result = res.json()
-                    except Exception as e:
-                        st.error("回應格式錯誤，非 JSON")
-                        st.code(res.text)
-                        return
-
-                    if res.status_code == 200:
-                        st.success("辨識成功！")
-                        st.subheader("📄 名片辨識結果：")
-                        st.json(result.get("ocr_text", {}))
-                        st.subheader("📝 語音備註轉文字：")
-                        st.write(result.get("voice_text", "（無語音）"))
-
-                        # 顯示送出按鈕
-                        if st.button("✅ 確認送出"):
-                            st.success("資料已送出（此功能可再串接資料庫）")
-
+                    if whisper_res.status_code == 200:
+                        voice_text = whisper_res.json()
                     else:
-                        st.error("辨識失敗，請確認圖片與語音格式")
-                        st.code(result)
-
+                        st.error("❌ 語音轉文字失敗")
+                        st.code(whisper_res.text)
                 except Exception as e:
-                    st.error("系統錯誤")
+                    st.error("❌ 傳送語音錯誤")
                     st.code(str(e))
+
+            # ✅ 顯示結果
+            if ocr_text:
+                st.success("✅ 圖片辨識成功！")
+                st.subheader("📄 名片辨識結果：")
+                st.json(ocr_text)
+            else:
+                st.warning("⚠️ 名片辨識沒有成功結果")
+
+            if voice_text:
+                st.success("✅ 語音轉文字成功！")
+                st.subheader("📝 語音備註：")
+                st.write(voice_text)
+            elif audio_file:
+                st.warning("⚠️ 無語音辨識結果")
+
+            # ✅ 顯示送出按鈕
+            if ocr_text:
+                if st.button("✅ 確認送出"):
+                    st.success("資料已送出（此功能可再串接資料庫）")
 
     # 🔙 返回按鈕
     st.markdown("---")
