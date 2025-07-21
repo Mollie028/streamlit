@@ -10,56 +10,45 @@ from core.config import API_BASE
 
 
 def add_card_page():
-    st.markdown("## 新增名片")
-    st.caption("📤 上傳名片圖片（可多選 JPG/PNG 或 ZIP 壓縮檔）")
+    st.markdown("## 📤 新增名片")
+    st.caption("支援上傳 JPG / PNG 圖片或 ZIP 壓縮檔")
 
     uploaded_files = st.file_uploader(
-        "拖曳圖片或壓縮檔到這裡",
+        "拖曳檔案至此，或點選選取檔案",
         type=["jpg", "jpeg", "png", "zip"],
         accept_multiple_files=True,
         label_visibility="collapsed"
     )
 
-    results = []
-    error_files = []
+    if "extracted_results" not in st.session_state:
+        st.session_state["extracted_results"] = []
 
     if uploaded_files:
         for file in uploaded_files:
             if file.name.endswith(".zip"):
-                zip_bytes = io.BytesIO(file.read())
-                with zipfile.ZipFile(zip_bytes, "r") as zip_ref:
+                with zipfile.ZipFile(io.BytesIO(file.read()), "r") as zip_ref:
                     for name in zip_ref.namelist():
                         if name.lower().endswith((".jpg", ".jpeg", ".png")):
                             img_bytes = zip_ref.read(name)
-                            result = process_image(name, img_bytes)
-                            if result:
-                                results.append(result)
-                            else:
-                                error_files.append(name)
+                            process_and_store(name, img_bytes)
             else:
                 img_bytes = file.read()
-                result = process_image(file.name, img_bytes)
-                if result:
-                    results.append(result)
-                else:
-                    error_files.append(file.name)
+                process_and_store(file.name, img_bytes)
 
-        if error_files:
-            st.warning("❌ 以下檔案辨識失敗：")
-            st.write(", ".join(error_files))
-
-    # 顯示 OCR 預覽結果（無下拉，直接顯示）
-    if results:
-        st.markdown("---")
+    # 顯示萃取結果（已美化）
+    if st.session_state["extracted_results"]:
         st.markdown("### 🔍 預覽辨識結果")
-        for r in results:
-            st.image(r["image"], caption=r["filename"], use_column_width=True)
-            st.markdown("#### 🧾 萃取欄位")
-            st.json(r["fields"])  # 結構化欄位
-            st.markdown("##### 🔤 原始文字")
-            st.code(r["text"])
+        for i, r in enumerate(st.session_state["extracted_results"]):
+            col1, col2 = st.columns([10, 1])
+            with col1:
+                st.markdown(f"**📝 {r['filename']}**")
+                st.markdown(format_fields(r["fields"]), unsafe_allow_html=True)
+            with col2:
+                if st.button("🗑️", key=f"del_{i}"):
+                    st.session_state["extracted_results"].pop(i)
+                    st.experimental_rerun()
 
-    # 語音備註（可選填）
+    # 語音備註（選填）
     st.markdown("---")
     st.markdown("🎤 語音備註（可選填）")
     audio_file = st.file_uploader("上傳語音檔（mp3 / wav / m4a）", type=["mp3", "wav", "m4a"])
@@ -75,71 +64,81 @@ def add_card_page():
             st.success("✅ 語音辨識成功！")
             st.text_area("📝 語音內容", value=note_text, height=100)
         else:
-            st.error("❌ 語音辨識失敗，請稍後再試")
+            st.error("❌ 語音辨識失敗")
 
-    # 送出所有資料
-    if results and st.button("✅ 一鍵送出到資料庫"):
-        user = st.session_state.get("user", {})
-        uid = user.get("id")
+    # 一鍵送出
+    if st.session_state["extracted_results"] and st.button("✅ 一鍵送出到資料庫"):
+        uid = st.session_state["user"].get("id")
         token = st.session_state.get("access_token", "")
         headers = {"Authorization": f"Bearer {token}"}
         success = 0
 
-        for r in results:
+        for r in st.session_state["extracted_results"]:
             payload = {
                 "user_id": uid,
-                "raw_text": r["text"],
+                "raw_text": r["raw_text"],
                 "filename": r["filename"],
                 "fields": r["fields"]
             }
             if note_text:
                 payload["note"] = note_text
 
-            res = requests.post(f"{API_BASE}/cards", json=payload, headers=headers)
+            res = requests.post(f"{API_BASE}/ocr", json=payload, headers=headers)
             if res.status_code == 200:
                 success += 1
-            else:
-                st.error(f"❌ 上傳失敗：{r['filename']}，{res.text}")
 
         st.success(f"✅ 成功送出 {success} 筆資料！")
+        st.session_state["extracted_results"] = []
 
     if st.button("🔙 返回首頁"):
         st.session_state["current_page"] = "home"
         st.rerun()
 
 
-def process_image(filename, image_bytes):
+def process_and_store(filename, image_bytes):
     try:
-        image = Image.open(io.BytesIO(image_bytes))
-        buffered = io.BytesIO()
-        image.save(buffered, format="PNG")
-        base64_img = base64.b64encode(buffered.getvalue()).decode()
-
         headers = {"Authorization": f"Bearer {st.session_state['access_token']}"}
         files = {"file": (filename, image_bytes)}
         res = requests.post(f"{API_BASE}/ocr/", files=files, headers=headers)
 
         if res.status_code == 200:
-            result = res.json()
-            return {
+            data = res.json()
+            st.session_state["extracted_results"].append({
                 "filename": filename,
-                "image": image,
-                "text": result.get("raw_text", ""),
-                "fields": result.get("fields", {})
-            }
+                "raw_text": data.get("text", ""),
+                "fields": data.get("fields", {})
+            })
         else:
-            st.error(f"❌ API 回傳失敗：{filename}，狀態碼 {res.status_code}，內容：{res.text}")
-            return None
+            st.error(f"❌ API 回傳失敗：{filename}，狀態碼 {res.status_code}")
     except Exception as e:
-        st.error(f"❌ 辨識過程錯誤：{filename}，錯誤訊息：{str(e)}")
-        return None
+        st.error(f"❌ 辨識失敗：{filename}，錯誤訊息：{str(e)}")
 
 
-# 給 app.py 呼叫的主入口
+def format_fields(fields: dict) -> str:
+    if not fields:
+        return "_無萃取欄位_"
+
+    html = "<div style='line-height:1.8; font-size: 16px;'>"
+    icon_map = {
+        "name": "👤",
+        "title": "🏷️",
+        "phone": "📞",
+        "email": "✉️",
+        "company_name": "🏢"
+    }
+
+    for key, value in fields.items():
+        icon = icon_map.get(key, "🔹")
+        html += f"<b>{icon} {key}</b>：{value}<br>"
+
+    html += "</div>"
+    return html
+
+
 def run():
     st.title("新增名片")
     try:
         add_card_page()
     except Exception as e:
-        st.error("❌ 名片新增頁面載入失敗，請稍後再試")
+        st.error("❌ 名片新增頁面載入失敗")
         st.code(str(e))
