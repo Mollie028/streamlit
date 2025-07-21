@@ -5,14 +5,10 @@ import tempfile
 import os
 from io import BytesIO
 
-# ✅ 模擬 get_current_user
 def get_current_user():
-    if "user" in st.session_state:
-        return st.session_state["user"]
-    return None
+    return st.session_state.get("user")
 
 API_BASE = "https://ocr-whisper-production-2.up.railway.app"
-
 st.set_page_config(page_title="新增名片", page_icon="📇", layout="wide")
 st.title("📇 新增名片")
 
@@ -60,10 +56,12 @@ for file in uploaded_files:
                     with open(full_path, "rb") as img_f:
                         data = recognize_image(img_f, fname)
                         if data:
+                            data["voice_note"] = ""
                             preview_data.append(data)
     else:
         data = recognize_image(file, file.name)
         if data:
+            data["voice_note"] = ""
             preview_data.append(data)
 
 if preview_data:
@@ -77,8 +75,11 @@ if preview_data:
             company_name = st.text_input("公司", value=card.get("company_name", ""), key=f"company_{i}")
 
             st.markdown("🎤 **語音備註**（可選）")
+            voice_note = card.get("voice_note", "")
+            if voice_note:
+                st.success("✅ 語音備註轉換成功")
+                st.write(voice_note)
             audio = st.file_uploader("上傳語音（mp3/wav/m4a）", type=["mp3", "wav", "m4a"], key=f"audio_{i}")
-            voice_note = ""
             if audio:
                 files = {"file": (audio.name, audio, "multipart/form-data")}
                 try:
@@ -117,5 +118,5 @@ if preview_data:
                 fail_count += 1
         st.success(f"✅ 成功儲存 {success_count} 筆，失敗 {fail_count} 筆")
 
-if st.button("🔙 返回主頁"):
-    st.switch_page("app.py")
+    st.markdown("🔙 [返回主頁](./)")
+
