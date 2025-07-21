@@ -1,100 +1,96 @@
+# frontend/components/add_card.py
 import streamlit as st
 import requests
 from PIL import Image
 import io
+import zipfile
+import base64
+from core.config import API_BASE
 
-API_BASE = "https://ocr-whisper-production-2.up.railway.app"  # 依你的實際後端 API URL 調整
+def add_card_page():
+    st.markdown("### 🆕 新增名片")
+    st.caption("📤 上傳名片圖片（可多選 JPG/PNG 或 ZIP 壓縮檔）")
 
-def run():
-    st.title("➕ 新增名片")
+    uploaded_files = st.file_uploader(
+        "Drag and drop files here",
+        type=["jpg", "jpeg", "png", "zip"],
+        accept_multiple_files=True,
+        label_visibility="collapsed"
+    )
 
-    # 回主選單
-    if st.button("🔙 返回主選單"):
+    if not uploaded_files:
+        st.info("請選擇圖片或壓縮檔上傳。")
+        return
+
+    results = []
+    error_files = []
+
+    for file in uploaded_files:
+        if file.name.endswith(".zip"):
+            zip_bytes = io.BytesIO(file.read())
+            with zipfile.ZipFile(zip_bytes, "r") as zip_ref:
+                for name in zip_ref.namelist():
+                    if name.lower().endswith((".jpg", ".jpeg", ".png")):
+                        img_bytes = zip_ref.read(name)
+                        result = process_image(name, img_bytes)
+                        if result:
+                            results.append(result)
+                        else:
+                            error_files.append(name)
+        else:
+            img_bytes = file.read()
+            result = process_image(file.name, img_bytes)
+            if result:
+                results.append(result)
+            else:
+                error_files.append(file.name)
+
+    if error_files:
+        st.warning("❌ 以下檔案辨識失敗：")
+        st.write(", ".join(error_files))
+
+    if results:
+        st.markdown("---")
+        st.markdown("### 🔍 預覽與確認")
+        for r in results:
+            with st.expander(f"📇 {r['filename']}"):
+                st.image(r["image"], use_column_width=True)
+                st.code(r["text"])
+
+        if st.button("✅ 一鍵送出到資料庫"):
+            user = st.session_state.get("user", {})
+            uid = user.get("id")
+            headers = {"Authorization": f"Bearer {st.session_state['access_token']}"}
+            success = 0
+            for r in results:
+                payload = {
+                    "user_id": uid,
+                    "raw_text": r["text"],
+                    "filename": r["filename"]
+                }
+                res = requests.post(f"{API_BASE}/ocr", json=payload, headers=headers)
+                if res.status_code == 200:
+                    success += 1
+            st.success(f"✅ 成功送出 {success} 筆資料！")
+
+    if st.button("🔙 返回首頁"):
         st.session_state["current_page"] = "home"
         st.rerun()
 
-    # 使用者資訊
-    user = st.session_state.get("user", {})
-    user_id = user.get("id")
+# 處理單張圖片邏輯
+def process_image(filename, image_bytes):
+    try:
+        image = Image.open(io.BytesIO(image_bytes))
+        buffered = io.BytesIO()
+        image.save(buffered, format="PNG")
+        b64_img = base64.b64encode(buffered.getvalue()).decode()
 
-    uploaded_files = st.file_uploader("📤 上傳名片圖片（支援多張）", type=["jpg", "png", "jpeg", "webp"], accept_multiple_files=True)
-
-    audio_bytes = st.file_uploader("🎤 上傳語音備註（選填，支援 mp3/wav）", type=["mp3", "wav", "m4a"])
-
-    if uploaded_files:
-        st.markdown("### 🖼️ 預覽上傳圖片與辨識結果")
-        results = []
-
-        for file in uploaded_files:
-            image = Image.open(file)
-            st.image(image, caption=file.name, use_column_width=True)
-
-            with st.spinner("辨識中..."):
-                files = {"file": (file.name, file, file.type)}
-                try:
-                    res = requests.post(f"{API_BASE}/ocr", files=files)
-                    if res.status_code == 200:
-                        data = res.json()
-                        st.success("✅ 名片文字辨識成功")
-                        st.code(data["text"])
-                        results.append(data)
-                    else:
-                        st.error(f"❌ 辨識失敗：{res.status_code}")
-                        st.code(res.text)
-                except Exception as e:
-                    st.error("❌ 連線失敗")
-                    st.code(str(e))
-
-        if audio_bytes:
-            st.markdown("---")
-            st.markdown("### 🎧 語音備註辨識結果")
-            try:
-                files = {"file": ("note.wav", audio_bytes, "audio/wav")}
-                res = requests.post(f"{API_BASE}/whisper", files=files)
-                if res.status_code == 200:
-                    whisper_result = res.json()
-                    st.success("✅ 語音辨識成功")
-                    st.code(whisper_result["text"])
-                else:
-                    st.error("❌ 語音辨識失敗")
-                    st.code(res.text)
-            except Exception as e:
-                st.error("❌ 語音辨識錯誤")
-                st.code(str(e))
-        else:
-            whisper_result = None
-
-        # 一鍵送出
-        if st.button("✅ 一鍵送出到資料庫"):
-            for data in results:
-                payload = {
-                    "user_id": user_id,
-                    "raw_text": data["text"],
-                    "fields": data.get("fields", {}),
-                }
-                try:
-                    res = requests.post(f"{API_BASE}/extract", json=payload)
-                    if res.status_code == 200:
-                        st.success("📥 成功寫入資料庫！")
-                    else:
-                        st.error("❌ 寫入失敗")
-                        st.code(res.text)
-                except Exception as e:
-                    st.error("❌ 送出錯誤")
-                    st.code(str(e))
-
-            # 如果語音備註有辨識，也一併送出
-            if whisper_result:
-                try:
-                    payload = {
-                        "user_id": user_id,
-                        "raw_text": whisper_result["text"],
-                    }
-                    res = requests.post(f"{API_BASE}/save_voice_note", json=payload)
-                    if res.status_code == 200:
-                        st.success("📝 語音備註已儲存")
-                    else:
-                        st.warning("❗ 無法儲存語音備註")
-                except Exception as e:
-                    st.error("❌ 備註送出錯誤")
-                    st.code(str(e))
+        headers = {"Authorization": f"Bearer {st.session_state['access_token']}"}
+        files = {"file": (filename, image_bytes)}
+        res = requests.post(f"{API_BASE}/ocr_image", files=files, headers=headers)
+        if res.status_code == 200:
+            text = res.json().get("text", "")
+            return {"filename": filename, "image": image, "text": text}
+        return None
+    except Exception as e:
+        return None
