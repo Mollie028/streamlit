@@ -9,7 +9,7 @@ from core.config import API_BASE
 
 
 def add_card_page():
-    st.markdown("🆕 新增名片")
+    st.markdown("新增名片")
     st.caption("📤 上傳名片圖片（可多選 JPG/PNG 或 ZIP 壓縮檔）")
 
     uploaded_files = st.file_uploader(
@@ -112,17 +112,21 @@ def process_image(filename, image_bytes):
         headers = {"Authorization": f"Bearer {st.session_state['access_token']}"}
         files = {"file": (filename, image_bytes)}
         res = requests.post(f"{API_BASE}/ocr_image", files=files, headers=headers)
+
         if res.status_code == 200:
             text = res.json().get("text", "")
             return {"filename": filename, "image": image, "text": text}
-        return None
-    except Exception:
+        else:
+            st.error(f"❌ API 回傳失敗：{filename}，狀態碼 {res.status_code}，內容：{res.text}")
+            return None
+    except Exception as e:
+        st.error(f"❌ 辨識過程錯誤：{filename}，錯誤訊息：{str(e)}")
         return None
 
 
 # 這段是給 app.py 呼叫的 run() 入口函數
 def run():
-    st.title("➕ 新增名片")
+    st.title("新增名片")
     try:
         add_card_page()
     except Exception as e:
