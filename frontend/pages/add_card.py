@@ -1,3 +1,4 @@
+# frontend/pages/add_card.py
 import streamlit as st
 import requests
 from PIL import Image
@@ -74,7 +75,7 @@ def add_card_page():
             st.error("❌ 語音辨識失敗，請稍後再試")
 
     # 送出所有資料
-    if st.button("✅ 一鍵送出到資料庫"):
+    if results and st.button("✅ 一鍵送出到資料庫"):
         user = st.session_state.get("user", {})
         uid = user.get("id")
         token = st.session_state.get("access_token", "")
@@ -117,3 +118,13 @@ def process_image(filename, image_bytes):
         return None
     except Exception:
         return None
+
+
+# 這段是給 app.py 呼叫的 run() 入口函數
+def run():
+    st.title("➕ 新增名片")
+    try:
+        add_card_page()
+    except Exception as e:
+        st.error("❌ 名片新增頁面載入失敗，請稍後再試")
+        st.code(str(e))
