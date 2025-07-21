@@ -111,7 +111,7 @@ def process_image(filename, image_bytes):
 
         headers = {"Authorization": f"Bearer {st.session_state['access_token']}"}
         files = {"file": (filename, image_bytes)}
-        res = requests.post(f"{API_BASE}/ocr_image", files=files, headers=headers)
+        res = requests.post(f"{API_BASE}/ocr", files=files, headers=headers)
 
         if res.status_code == 200:
             text = res.json().get("text", "")
