@@ -5,8 +5,12 @@ import tempfile
 import os
 from utils.session import get_current_user
 from utils.api_base import API_BASE
-from utils.text import convert_to_traditional
+from opencc import OpenCC
+cc = OpenCC('s2t') 
 
+def convert_to_traditional(text: str) -> str:
+    return cc.convert(text)
+    
 st.set_page_config(page_title="新增名片", page_icon="📇", layout="wide")
 
 st.title("📇 新增名片")
