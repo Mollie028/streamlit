@@ -1,6 +1,5 @@
 import streamlit as st
 import requests
-from audio_recorder_streamlit import audio_recorder
 from core.config import API_BASE
 
 st.set_page_config(page_title="名片辨識系統", layout="centered")
@@ -41,6 +40,13 @@ if st.session_state["current_page"] == "login":
                         "id": result.get("id"),
                         "username": username,
                         "is_admin": result.get("role", "user") == "admin"
+                    }
+
+                    # ✅ 新增：給各頁共用的使用者資訊
+                    st.session_state["user"] = {
+                        "id": result.get("id"),
+                        "username": username,
+                        "role": result.get("role", "user")
                     }
 
                     st.session_state["current_page"] = "home"
