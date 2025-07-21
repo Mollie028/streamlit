@@ -1,4 +1,5 @@
 # frontend/pages/add_card.py
+
 import streamlit as st
 import requests
 from PIL import Image
@@ -9,7 +10,7 @@ from core.config import API_BASE
 
 
 def add_card_page():
-    st.markdown("新增名片")
+    st.markdown("## 新增名片")
     st.caption("📤 上傳名片圖片（可多選 JPG/PNG 或 ZIP 壓縮檔）")
 
     uploaded_files = st.file_uploader(
@@ -47,16 +48,18 @@ def add_card_page():
             st.warning("❌ 以下檔案辨識失敗：")
             st.write(", ".join(error_files))
 
-    # 顯示 OCR 預覽結果
+    # 顯示 OCR 預覽結果（無下拉，直接顯示）
     if results:
         st.markdown("---")
-        st.markdown("### 🔍 預覽與確認")
+        st.markdown("### 🔍 預覽辨識結果")
         for r in results:
-            with st.expander(f"📇 {r['filename']}"):
-                st.image(r["image"], use_column_width=True)
-                st.code(r["text"])
+            st.image(r["image"], caption=r["filename"], use_column_width=True)
+            st.markdown("#### 🧾 萃取欄位")
+            st.json(r["fields"])  # 結構化欄位
+            st.markdown("##### 🔤 原始文字")
+            st.code(r["text"])
 
-    # 上傳語音備註
+    # 語音備註（可選填）
     st.markdown("---")
     st.markdown("🎤 語音備註（可選填）")
     audio_file = st.file_uploader("上傳語音檔（mp3 / wav / m4a）", type=["mp3", "wav", "m4a"])
@@ -79,23 +82,24 @@ def add_card_page():
         user = st.session_state.get("user", {})
         uid = user.get("id")
         token = st.session_state.get("access_token", "")
-        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        headers = {"Authorization": f"Bearer {token}"}
         success = 0
 
         for r in results:
             payload = {
                 "user_id": uid,
                 "raw_text": r["text"],
-                "filename": r["filename"]
+                "filename": r["filename"],
+                "fields": r["fields"]
             }
             if note_text:
                 payload["note"] = note_text
 
-            res = requests.post(f"{API_BASE}/ocr/save", json=payload, headers=headers)
+            res = requests.post(f"{API_BASE}/cards", json=payload, headers=headers)
             if res.status_code == 200:
                 success += 1
             else:
-                st.error(f"❌ 儲存失敗：{r['filename']}\n{res.text}")
+                st.error(f"❌ 上傳失敗：{r['filename']}，{res.text}")
 
         st.success(f"✅ 成功送出 {success} 筆資料！")
 
@@ -116,8 +120,13 @@ def process_image(filename, image_bytes):
         res = requests.post(f"{API_BASE}/ocr/", files=files, headers=headers)
 
         if res.status_code == 200:
-            text = res.json().get("text", "")
-            return {"filename": filename, "image": image, "text": text}
+            result = res.json()
+            return {
+                "filename": filename,
+                "image": image,
+                "text": result.get("raw_text", ""),
+                "fields": result.get("fields", {})
+            }
         else:
             st.error(f"❌ API 回傳失敗：{filename}，狀態碼 {res.status_code}，內容：{res.text}")
             return None
@@ -126,7 +135,7 @@ def process_image(filename, image_bytes):
         return None
 
 
-# 這段是給 app.py 呼叫的 run() 入口函數
+# 給 app.py 呼叫的主入口
 def run():
     st.title("新增名片")
     try:
