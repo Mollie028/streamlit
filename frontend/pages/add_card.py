@@ -3,39 +3,41 @@ import requests
 import zipfile
 import tempfile
 import os
-from utils.session import get_current_user
-from utils.api_base import API_BASE
 from opencc import OpenCC
 
-# --- 轉繁體工具 ---
-cc = OpenCC('s2t')
+# ✅ 模擬 utils.session.get_current_user
+def get_current_user():
+    return st.session_state.get("user")
+
+# ✅ 模擬 utils.api_base.API_BASE
+API_BASE = "https://ocr-whisper-production-2.up.railway.app"
+
+# ✅ 轉換簡體為繁體
+cc = OpenCC("s2t")
 def convert_to_traditional(text: str) -> str:
     return cc.convert(text)
 
 st.set_page_config(page_title="新增名片", page_icon="📇", layout="wide")
 st.title("📇 新增名片")
 
-# --- 驗證登入狀態 ---
 user = get_current_user()
 if not user:
     st.warning("請先登入")
     st.stop()
 
-# --- 上傳區 ---
 uploaded_files = st.file_uploader(
-    "請上傳名片圖片（可直接拍照、多選圖片或 ZIP 壓縮檔）",
+    "📷 請上傳名片圖片（支援手機拍照、多選、ZIP 壓縮）",
     type=["jpg", "jpeg", "png", "zip"],
-    accept_multiple_files=True,
-    label_visibility="visible"
+    accept_multiple_files=True
 )
 
 if not uploaded_files:
-    st.info("請上傳至少一張名片圖片或壓縮檔。")
+    st.info("請選擇圖片或壓縮檔上傳。")
     st.stop()
 
 preview_data = []
 
-# --- 處理所有上傳檔案 ---
+# 🔄 處理所有上傳的圖片或壓縮檔
 for file in uploaded_files:
     if file.type == "application/zip":
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -60,7 +62,7 @@ for file in uploaded_files:
                             else:
                                 st.warning(f"❌ {fname} 辨識失敗：{res.text}")
                         except Exception as e:
-                            st.error(f"⚠️ 錯誤（{fname}）：{e}")
+                            st.error(f"⚠️ {fname} 發生錯誤：{e}")
     else:
         files = {"file": (file.name, file, "multipart/form-data")}
         try:
@@ -74,24 +76,24 @@ for file in uploaded_files:
             else:
                 st.warning(f"❌ {file.name} 辨識失敗：{res.text}")
         except Exception as e:
-            st.error(f"⚠️ 錯誤（{file.name}）：{e}")
+            st.error(f"⚠️ {file.name} 發生錯誤：{e}")
 
-# --- 預覽區與送出按鈕 ---
+# ✅ 顯示預覽並送出
 if preview_data:
-    st.subheader("🔍 預覽與送出")
+    st.subheader("🔍 預覽名片資料與送出")
     for i, card in enumerate(preview_data):
         with st.expander(f"名片 {i+1}"):
             name = st.text_input("姓名", value=card.get("name", ""), key=f"name_{i}")
             phone = st.text_input("電話", value=card.get("phone", ""), key=f"phone_{i}")
             email = st.text_input("Email", value=card.get("email", ""), key=f"email_{i}")
             title = st.text_input("職稱", value=card.get("title", ""), key=f"title_{i}")
-            company_name = st.text_input("公司", value=card.get("company_name", ""), key=f"company_{i}")
+            company = st.text_input("公司", value=card.get("company_name", ""), key=f"company_{i}")
             preview_data[i] = {
                 "name": name,
                 "phone": phone,
                 "email": email,
                 "title": title,
-                "company_name": company_name
+                "company_name": company
             }
 
     if st.button("✅ 一鍵送出全部資料"):
@@ -106,10 +108,10 @@ if preview_data:
                     st.error(f"❌ 儲存失敗：{res.text}")
                     fail_count += 1
             except Exception as e:
-                st.error(f"⚠️ 儲存錯誤：{e}")
+                st.error(f"⚠️ 錯誤：{e}")
                 fail_count += 1
         st.success(f"✅ 成功儲存 {success_count} 筆，失敗 {fail_count} 筆")
 
-# --- 返回主頁 ---
+# 🔙 返回主頁按鈕
 if st.button("🔙 返回主頁"):
     st.switch_page("app.py")
