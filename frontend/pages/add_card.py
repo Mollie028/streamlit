@@ -1,94 +1,110 @@
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
-
 import streamlit as st
 import requests
-from core.config import API_BASE
-from services.auth_service import is_logged_in, logout_button
+import zipfile
+import tempfile
+import os
+from utils.session import get_current_user
+from utils.api_base import API_BASE
+from utils.text import convert_to_traditional
 
+st.set_page_config(page_title="新增名片", page_icon="📇", layout="wide")
 
-def run():
-    # ☁️ 登入檢查
-    if not is_logged_in():
-        st.error("請先登入")
-        st.stop()
+st.title("📇 新增名片")
 
-    # ✅ 頁面設定
-    st.set_page_config(page_title="新增名片")
-    st.title("🆕 新增名片")
-    logout_button()
+user = get_current_user()
+if not user:
+    st.warning("請先登入")
+    st.stop()
 
-    # 📸 上傳名片圖片
-    st.subheader("📸 上傳名片圖片")
-    image_file = st.file_uploader("請上傳名片圖片", type=["png", "jpg", "jpeg"])
+uploaded_files = st.file_uploader(
+    "請上傳名片圖片（可多選 JPG/PNG 或 ZIP 壓縮檔）",
+    type=["jpg", "jpeg", "png", "zip"],
+    accept_multiple_files=True
+)
 
-    # 🎙️ 上傳語音備註（選填）
-    st.subheader("🎤 上傳語音備註（選填）")
-    audio_file = st.file_uploader("請上傳語音音檔（.mp3 / .wav）", type=["mp3", "wav"])
+if not uploaded_files:
+    st.info("請選擇圖片或壓縮檔上傳。")
+    st.stop()
 
-    ocr_result = None
-    whisper_result = None
+preview_data = []
 
-    # 🚀 開始辨識按鈕
-    if st.button("🚀 開始辨識"):
-        if not image_file:
-            st.warning("請先上傳名片圖片")
-            return
+# 處理所有上傳的檔案
+for file in uploaded_files:
+    if file.type == "application/zip":
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            zip_path = os.path.join(tmp_dir, file.name)
+            with open(zip_path, "wb") as f:
+                f.write(file.read())
 
-        with st.spinner("辨識中，請稍候..."):
-            # ✅ 傳送圖片到後端 /ocr/
-            try:
-                ocr_response = requests.post(
-                    f"{API_BASE}/ocr/",
-                    files={"file": (image_file.name, image_file, image_file.type)},
-                    headers={"Authorization": f"Bearer {st.session_state['access_token']}"}
-                )
-                if ocr_response.status_code == 200:
-                    ocr_result = ocr_response.json()
-                    st.success("✅ 名片圖片辨識成功")
-                    st.subheader("📄 名片欄位內容：")
-                    st.json(ocr_result.get("fields", {}))
-                else:
-                    st.error("❌ 圖片辨識失敗")
-                    st.code(ocr_response.text)
-            except Exception as e:
-                st.error("❌ 傳送圖片錯誤")
-                st.code(str(e))
+            with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                zip_ref.extractall(tmp_dir)
 
-            # ✅ 傳送語音檔（可選）
-            if audio_file:
-                try:
-                    whisper_response = requests.post(
-                        f"{API_BASE}/whisper/",
-                        files={"audio": (audio_file.name, audio_file, audio_file.type)},
-                        headers={"Authorization": f"Bearer {st.session_state['access_token']}"}
-                    )
-                    if whisper_response.status_code == 200:
-                        whisper_result = whisper_response.json()
-                        st.success("✅ 語音轉文字成功")
-                        st.subheader("📝 備註內容：")
-                        st.write(whisper_result.get("text", ""))
-                    else:
-                        st.error("❌ 語音辨識失敗")
-                        st.code(whisper_response.text)
-                except Exception as e:
-                    st.error("❌ 傳送語音錯誤")
-                    st.code(str(e))
+            for fname in os.listdir(tmp_dir):
+                if fname.lower().endswith((".jpg", ".jpeg", ".png")):
+                    with open(os.path.join(tmp_dir, fname), "rb") as img_f:
+                        files = {"file": (fname, img_f, "multipart/form-data")}
+                        try:
+                            res = requests.post(f"{API_BASE}/ocr", files=files)
+                            if res.ok:
+                                data = res.json()
+                                # 自動轉繁體
+                                for k in data:
+                                    if isinstance(data[k], str):
+                                        data[k] = convert_to_traditional(data[k])
+                                preview_data.append(data)
+                            else:
+                                st.warning(f"❌ {fname} 辨識失敗：{res.text}")
+                        except Exception as e:
+                            st.error(f"⚠️ 錯誤（{fname}）：{e}")
+    else:
+        files = {"file": (file.name, file, "multipart/form-data")}
+        try:
+            res = requests.post(f"{API_BASE}/ocr", files=files)
+            if res.ok:
+                data = res.json()
+                for k in data:
+                    if isinstance(data[k], str):
+                        data[k] = convert_to_traditional(data[k])
+                preview_data.append(data)
             else:
-                st.info("ℹ️ 未上傳語音，略過語音辨識")
+                st.warning(f"❌ {file.name} 辨識失敗：{res.text}")
+        except Exception as e:
+            st.error(f"⚠️ 錯誤（{file.name}）：{e}")
 
-        # ✅ 確認送出按鈕（目前僅顯示訊息）
-        if ocr_result:
-            if st.button("✅ 確認送出"):
-                st.success("資料已送出（你可以在此串接資料庫或 API）")
+# 顯示辨識結果與送出按鈕
+if preview_data:
+    st.subheader("🔍 預覽與送出")
+    for i, card in enumerate(preview_data):
+        with st.expander(f"名片 {i+1}"):
+            name = st.text_input("姓名", value=card.get("name", ""), key=f"name_{i}")
+            phone = st.text_input("電話", value=card.get("phone", ""), key=f"phone_{i}")
+            email = st.text_input("Email", value=card.get("email", ""), key=f"email_{i}")
+            title = st.text_input("職稱", value=card.get("title", ""), key=f"title_{i}")
+            company_name = st.text_input("公司", value=card.get("company_name", ""), key=f"company_{i}")
+            preview_data[i] = {
+                "name": name,
+                "phone": phone,
+                "email": email,
+                "title": title,
+                "company_name": company_name
+            }
 
-    # 🔙 返回主選單
-    st.markdown("---")
-    if st.button("🔙 返回主選單"):
-        role = st.session_state.get("role", "")
-        if role == "admin":
-            st.session_state["current_page"] = "account"
-        else:
-            st.session_state["current_page"] = "change_password"
-        st.rerun()
+    if st.button("✅ 一鍵送出全部資料"):
+        success_count = 0
+        fail_count = 0
+        for card in preview_data:
+            try:
+                res = requests.post(f"{API_BASE}/cards", json=card)
+                if res.ok:
+                    success_count += 1
+                else:
+                    st.error(f"❌ 儲存失敗：{res.text}")
+                    fail_count += 1
+            except Exception as e:
+                st.error(f"⚠️ 錯誤：{e}")
+                fail_count += 1
+        st.success(f"✅ 已成功儲存 {success_count} 筆，失敗 {fail_count} 筆")
+
+# 返回主頁按鈕
+if st.button("🔙 返回主頁"):
+    st.switch_page("app.py")
