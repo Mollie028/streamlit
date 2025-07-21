@@ -5,4 +5,4 @@ audio-recorder-streamlit
 streamlit-extras
 psycopg2-binary
 streamlit-aggrid
-
+opencc
