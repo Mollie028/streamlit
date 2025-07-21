@@ -79,7 +79,7 @@ def add_card_page():
         user = st.session_state.get("user", {})
         uid = user.get("id")
         token = st.session_state.get("access_token", "")
-        headers = {"Authorization": f"Bearer {token}"}
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
         success = 0
 
         for r in results:
@@ -91,9 +91,11 @@ def add_card_page():
             if note_text:
                 payload["note"] = note_text
 
-            res = requests.post(f"{API_BASE}/ocr", json=payload, headers=headers)
+            res = requests.post(f"{API_BASE}/ocr/save", json=payload, headers=headers)
             if res.status_code == 200:
                 success += 1
+            else:
+                st.error(f"❌ 儲存失敗：{r['filename']}\n{res.text}")
 
         st.success(f"✅ 成功送出 {success} 筆資料！")
 
@@ -111,7 +113,7 @@ def process_image(filename, image_bytes):
 
         headers = {"Authorization": f"Bearer {st.session_state['access_token']}"}
         files = {"file": (filename, image_bytes)}
-        res = requests.post(f"{API_BASE}/ocr/", files=files, headers=headers)
+        res = requests.post(f"{API_BASE}/ocr", files=files, headers=headers)
 
         if res.status_code == 200:
             text = res.json().get("text", "")
