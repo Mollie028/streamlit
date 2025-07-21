@@ -6,9 +6,20 @@ import io
 import zipfile
 import base64
 from core.config import API_BASE
+from frontend.components.add_card import add_card_page
+
+
+def run():
+    st.title("➕ 新增名片")
+    try:
+        add_card_page()
+    except Exception as e:
+        st.error("❌ 名片新增頁面載入失敗，請稍後再試")
+        st.code(str(e))
+
 
 def add_card_page():
-    st.markdown("### 🆕 新增名片")
+    st.markdown("🆕 新增名片")
     st.caption("📤 上傳名片圖片（可多選 JPG/PNG 或 ZIP 壓縮檔）")
 
     uploaded_files = st.file_uploader(
