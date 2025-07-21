@@ -36,11 +36,13 @@ def run():
             users = res.json()
         else:
             st.error("🚫 無法取得使用者清單")
+            st.code(res.text)  # ✅ 加這行：顯示後端回傳的錯誤訊息
             st.stop()
     except Exception as e:
         st.error("❌ 發生錯誤")
         st.code(str(e))
         st.stop()
+
 
     # ✅ 建立 DataFrame
     df = pd.DataFrame(users)
