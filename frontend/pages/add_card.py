@@ -6,40 +6,42 @@ import os
 from utils.session import get_current_user
 from utils.api_base import API_BASE
 from opencc import OpenCC
-cc = OpenCC('s2t') 
 
+# --- 轉繁體工具 ---
+cc = OpenCC('s2t')
 def convert_to_traditional(text: str) -> str:
     return cc.convert(text)
-    
-st.set_page_config(page_title="新增名片", page_icon="📇", layout="wide")
 
+st.set_page_config(page_title="新增名片", page_icon="📇", layout="wide")
 st.title("📇 新增名片")
 
+# --- 驗證登入狀態 ---
 user = get_current_user()
 if not user:
     st.warning("請先登入")
     st.stop()
 
+# --- 上傳區 ---
 uploaded_files = st.file_uploader(
-    "請上傳名片圖片（可多選 JPG/PNG 或 ZIP 壓縮檔）",
+    "請上傳名片圖片（可直接拍照、多選圖片或 ZIP 壓縮檔）",
     type=["jpg", "jpeg", "png", "zip"],
-    accept_multiple_files=True
+    accept_multiple_files=True,
+    label_visibility="visible"
 )
 
 if not uploaded_files:
-    st.info("請選擇圖片或壓縮檔上傳。")
+    st.info("請上傳至少一張名片圖片或壓縮檔。")
     st.stop()
 
 preview_data = []
 
-# 處理所有上傳的檔案
+# --- 處理所有上傳檔案 ---
 for file in uploaded_files:
     if file.type == "application/zip":
         with tempfile.TemporaryDirectory() as tmp_dir:
             zip_path = os.path.join(tmp_dir, file.name)
             with open(zip_path, "wb") as f:
                 f.write(file.read())
-
             with zipfile.ZipFile(zip_path, "r") as zip_ref:
                 zip_ref.extractall(tmp_dir)
 
@@ -51,7 +53,6 @@ for file in uploaded_files:
                             res = requests.post(f"{API_BASE}/ocr", files=files)
                             if res.ok:
                                 data = res.json()
-                                # 自動轉繁體
                                 for k in data:
                                     if isinstance(data[k], str):
                                         data[k] = convert_to_traditional(data[k])
@@ -75,7 +76,7 @@ for file in uploaded_files:
         except Exception as e:
             st.error(f"⚠️ 錯誤（{file.name}）：{e}")
 
-# 顯示辨識結果與送出按鈕
+# --- 預覽區與送出按鈕 ---
 if preview_data:
     st.subheader("🔍 預覽與送出")
     for i, card in enumerate(preview_data):
@@ -105,10 +106,10 @@ if preview_data:
                     st.error(f"❌ 儲存失敗：{res.text}")
                     fail_count += 1
             except Exception as e:
-                st.error(f"⚠️ 錯誤：{e}")
+                st.error(f"⚠️ 儲存錯誤：{e}")
                 fail_count += 1
-        st.success(f"✅ 已成功儲存 {success_count} 筆，失敗 {fail_count} 筆")
+        st.success(f"✅ 成功儲存 {success_count} 筆，失敗 {fail_count} 筆")
 
-# 返回主頁按鈕
+# --- 返回主頁 ---
 if st.button("🔙 返回主頁"):
     st.switch_page("app.py")
