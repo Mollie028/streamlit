@@ -57,7 +57,7 @@ df["使用者狀況"] = df["使用者狀況"].map(status_map)
 
 # ✅ 建立欄位設定
 gb = GridOptionsBuilder.from_dataframe(df)
-gb.configure_default_column(editable=False)
+gb.configure_default_column(editable=False, resizable=False)
 gb.configure_column("是否為管理員", editable=is_admin)
 gb.configure_column("備註", editable=is_admin)
 gb.configure_column("使用者狀況", editable=is_admin, cellEditor="agSelectCellEditor",
@@ -71,7 +71,11 @@ grid_response = AgGrid(
     update_mode=GridUpdateMode.MANUAL,
     height=380,
     allow_unsafe_jscode=True,
-    theme="streamlit"
+    theme="streamlit",
+    fit_columns_on_grid_load=True,
+    reload_data=True,
+    use_checkbox=True,
+    enable_enterprise_modules=False
 )
 
 # ✅ 儲存變更按鈕
