@@ -9,7 +9,6 @@ def run():
 
     API_URL = "https://ocr-whisper-production-2.up.railway.app"
 
-    # ========== 後端互動邏輯 ==========
     def fetch_users():
         try:
             res = requests.get(f"{API_URL}/users")
@@ -18,96 +17,93 @@ def run():
             st.error(f"❌ 無法取得使用者資料：{e}")
             return []
 
-    def update_user(user_id, updated_data):
+    def update_user(user_id, data):
         try:
-            res = requests.put(f"{API_URL}/update_user/{user_id}", json=updated_data)
+            res = requests.put(f"{API_URL}/update_user/{user_id}", json=data)
             return res.status_code == 200
         except:
             return False
 
-    def update_user_password(user_id, new_password):
+    def delete_user(user_id):
         try:
-            res = requests.put(f"{API_URL}/update_user_password/{user_id}", json={"new_password": new_password})
+            res = requests.delete(f"{API_URL}/delete_user/{user_id}")
             return res.status_code == 200
         except:
             return False
 
-    def batch_update(users_df, original_df):
-        changes = []
-        for _, row in users_df.iterrows():
-            original = original_df[original_df['id'] == row['id']].iloc[0]
-            changed_fields = {}
-            for field in ['note', 'company', 'is_admin', 'is_active']:
-                if row[field] != original[field]:
-                    changed_fields[field] = row[field]
-            if changed_fields:
-                changes.append((row['id'], changed_fields))
+    search = st.text_input("🔍 輸入使用者帳號或 ID 查詢")
+    data = fetch_users()
 
-        for user_id, fields in changes:
-            update_user(user_id, fields)
-        return len(changes)
+    if data:
+        df = pd.DataFrame(data)
 
-    def batch_action(user_ids, action):
-        count = 0
-        for uid in user_ids:
-            if action == "啟用帳號":
-                success = update_user(uid, {"is_active": True})
-            elif action == "停用帳號":
-                success = update_user(uid, {"is_active": False})
-            elif action == "刪除帳號":
-                res = requests.delete(f"{API_URL}/delete_user/{uid}")
-                success = res.status_code == 200
-            else:
-                success = False
-            if success:
-                count += 1
-        return count
+        if search:
+            df = df[df["username"].str.contains(search) | df["id"].astype(str).str.contains(search)]
 
-    # ========== 主頁面邏輯 ==========
-    search_keyword = st.text_input("🔍 搜尋帳號或 ID：")
-    users_data = fetch_users()
+        columns_order = ["id", "username", "note", "company", "is_admin", "is_active"]
+        df = df[columns_order]
 
-    if users_data:
-        df = pd.DataFrame(users_data)
-        if search_keyword:
-            df = df[df['username'].str.contains(search_keyword, case=False) | df['id'].astype(str).str.contains(search_keyword)]
-
-        editable_fields = ['note', 'company', 'is_admin', 'is_active']
         gb = GridOptionsBuilder.from_dataframe(df)
-        for col in editable_fields:
-            gb.configure_column(col, editable=True)
-        gb.configure_selection('multiple', use_checkbox=True)
+        gb.configure_default_column(editable=False)
+        gb.configure_column("note", editable=True)
+        gb.configure_column("company", editable=True)
+        gb.configure_column("is_admin", editable=True)
+        gb.configure_column("is_active", editable=True)
+        gb.configure_selection(selection_mode="multiple", use_checkbox=True)
         gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
-        grid_options = gb.build()
+        gridOptions = gb.build()
 
-        st.markdown("### 👥 使用者列表")
         grid_response = AgGrid(
             df,
-            gridOptions=grid_options,
+            gridOptions=gridOptions,
             update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED,
-            allow_unsafe_jscode=True,
+            fit_columns_on_grid_load=True,
             height=380,
-            fit_columns_on_grid_load=True
+            allow_unsafe_jscode=True
         )
 
-        edited_rows = grid_response["data"]
-        selected = grid_response["selected_rows"]
+        new_df = pd.DataFrame(grid_response["data"])
+        selected = grid_response.get("selected_rows", [])
 
+        st.markdown("### ✏️ 欄位修改")
         if st.button("💾 儲存所有欄位修改"):
-            updated_count = batch_update(pd.DataFrame(edited_rows), df)
-            st.success(f"✅ 已儲存 {updated_count} 筆變更")
+            changed_rows = 0
+            for i in range(len(new_df)):
+                original = df.iloc[i]
+                updated = new_df.iloc[i]
+                if not updated.equals(original):
+                    payload = {
+                        "note": updated["note"],
+                        "company": updated["company"],
+                        "is_admin": updated["is_admin"],
+                        "is_active": updated["is_active"]
+                    }
+                    success = update_user(updated["id"], payload)
+                    if success:
+                        changed_rows += 1
+            st.success(f"✅ 已更新 {changed_rows} 筆帳號資料")
 
-        if selected:
+        st.markdown("### 🔧 多筆帳號批次操作")
+        if isinstance(selected, list) and len(selected) > 0:
             selected_ids = [row['id'] for row in selected if isinstance(row, dict) and not row.get("is_admin", False)]
             if selected_ids:
-                st.markdown("### 🔧 批次操作")
-                batch_opt = st.selectbox("選擇要執行的操作", ["啟用帳號", "停用帳號", "刪除帳號"])
-                if st.button("執行批次操作"):
-                    count = batch_action(selected_ids, batch_opt)
-                    st.success(f"✅ 已對 {count} 筆帳號執行「{batch_opt}」操作")
+                action = st.selectbox("請選擇操作", ["啟用帳號", "停用帳號", "刪除帳號"])
+                if st.button("執行操作"):
+                    count = 0
+                    for uid in selected_ids:
+                        if action == "啟用帳號":
+                            if update_user(uid, {"is_active": True}):
+                                count += 1
+                        elif action == "停用帳號":
+                            if update_user(uid, {"is_active": False}):
+                                count += 1
+                        elif action == "刪除帳號":
+                            if delete_user(uid):
+                                count += 1
+                    st.success(f"✅ 已完成 {action}，共 {count} 筆")
             else:
-                st.warning("⚠️ 已選取帳號中包含管理員，無法進行批次操作")
+                st.warning("⚠️ 不可對管理員進行批次操作")
         else:
-            st.info("ℹ️ 請先選取要操作的帳號")
+            st.info("請先選取要操作的帳號 ✅")
     else:
-        st.warning("⚠️ 尚無帳號資料")
+        st.warning("⚠️ 無法載入帳號資料")
