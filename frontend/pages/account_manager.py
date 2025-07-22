@@ -9,7 +9,7 @@ import os
 # ✅ 加入路徑以正確匯入模組
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../')))
 from core.config import API_BASE
-from frontend.services.auth_service import is_logged_in, logout_button
+from services.auth_service import is_logged_in, logout_button
 
 st.set_page_config(page_title="帳號管理", layout="wide")
 
