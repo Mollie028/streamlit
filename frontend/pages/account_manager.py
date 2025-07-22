@@ -1,13 +1,8 @@
-
 import streamlit as st
 import pandas as pd
 import requests
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-import sys
-import os
 
-# ✅ 加入路徑以正確匯入模組
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../')))
 from core.config import API_BASE
 from services.auth_service import is_logged_in, logout_button
 
@@ -47,6 +42,9 @@ df.rename(columns={
     "note": "備註"
 }, inplace=True)
 
+# ✅ 將布林值轉換成「啟用／停用」
+df["使用者狀況"] = df["使用者狀況"].apply(lambda x: "啟用" if x else "停用")
+
 # ✅ 建立 AgGrid 表格選項
 builder = GridOptionsBuilder.from_dataframe(df)
 builder.configure_default_column(editable=False)
@@ -77,21 +75,22 @@ updated_df = grid_return["data"]
 if st.button("💾 儲存變更"):
     for i, row in updated_df.iterrows():
         user_id = row["ID"]
-        payload = {
-            "is_admin": row["是否為管理員"],
-            "note": row["備註"]
-        }
 
         # 狀態處理
-        if row["使用者狀況"] == "啟用":
+        status = row["使用者狀況"]
+        if status == "啟用":
             requests.put(f"{API_BASE}/enable_user/{user_id}")
-        elif row["使用者狀況"] == "停用":
+        elif status == "停用":
             requests.put(f"{API_BASE}/disable_user/{user_id}")
-        elif row["使用者狀況"] == "刪除":
+        elif status == "刪除":
             requests.delete(f"{API_BASE}/delete_user/{user_id}")
 
         # 權限與備註更新
         if is_admin:
+            payload = {
+                "is_admin": row["是否為管理員"],
+                "note": row["備註"]
+            }
             requests.put(f"{API_BASE}/update_user/{user_id}", json=payload)
 
     st.success("✅ 帳號更新完成，請重新整理頁面查看最新狀態")
