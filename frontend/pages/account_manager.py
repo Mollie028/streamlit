@@ -1,7 +1,10 @@
 import streamlit as st
+import pandas as pd
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
 import requests
-from utils.auth import is_logged_in, logout_button
+from services.auth_service import is_logged_in, logout_button
+from core.config import API_BASE
+
 
 # 權限檢查
 user_info = is_logged_in()
@@ -86,7 +89,8 @@ single_click_edit = JsCode('''
         }
     }
 ''')
-options.configure_column("使用者狀況", cellEditor=single_click_edit)
+options.configure_column("使用者狀況", cellEditorJsCode=single_click_edit, width=120)
+
 
 # 顯示 AgGrid 表格
 st.markdown("### 👇 點選並編輯欄位，完成後請按下方儲存")
