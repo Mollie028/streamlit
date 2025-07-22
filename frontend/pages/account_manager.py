@@ -9,7 +9,6 @@ def run():
 
     API_URL = "https://ocr-whisper-production-2.up.railway.app"
 
-    # === API functions ===
     def fetch_users():
         try:
             res = requests.get(f"{API_URL}/users")
@@ -42,7 +41,6 @@ def run():
                     changed_fields[field] = row[field]
             if changed_fields:
                 changes.append((row['id'], changed_fields))
-
         for user_id, fields in changes:
             update_user(user_id, fields)
         return len(changes)
@@ -63,28 +61,27 @@ def run():
                 count += 1
         return count
 
-    # === 主邏輯 ===
     search_keyword = st.text_input("🔍 搜尋帳號或 ID：")
     users_data = fetch_users()
 
     if users_data:
         df = pd.DataFrame(users_data)
 
-        # 補上缺欄位（若後端沒傳）
+        # 強制補齊欄位並轉換型別
         expected_cols = ['id', 'username', 'note', 'company', 'is_admin', 'is_active']
         for col in expected_cols:
             if col not in df.columns:
                 df[col] = ""
-
         df = df.reindex(columns=expected_cols)
+        df['is_admin'] = df['is_admin'].astype(bool)
+        df['is_active'] = df['is_active'].astype(bool)
 
         if search_keyword:
-            df = df[df['username'].astype(str).str.contains(search_keyword, case=False) | 
+            df = df[df['username'].astype(str).str.contains(search_keyword, case=False) |
                     df['id'].astype(str).str.contains(search_keyword)]
 
         st.markdown("### 👥 使用者列表")
 
-        # 設定 AgGrid
         gb = GridOptionsBuilder.from_dataframe(df)
         for col in ['note', 'company', 'is_admin', 'is_active']:
             gb.configure_column(col, editable=True)
@@ -92,7 +89,6 @@ def run():
         gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
         grid_options = gb.build()
 
-        # 顯示表格（固定高度不跳）
         grid_response = AgGrid(
             df,
             gridOptions=grid_options,
@@ -105,13 +101,11 @@ def run():
         edited_rows = pd.DataFrame(grid_response["data"])
         selected = grid_response.get("selected_rows", [])
 
-        # 儲存修改
         if st.button("💾 儲存所有欄位修改"):
             updated_count = batch_update(edited_rows, df)
             st.success(f"✅ 已儲存 {updated_count} 筆變更")
 
-        # 批次操作區塊
-        if selected and isinstance(selected, list):
+        if isinstance(selected, list) and selected:
             try:
                 selected_ids = [row['id'] for row in selected if not row.get("is_admin", False)]
                 if selected_ids:
