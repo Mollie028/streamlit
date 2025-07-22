@@ -105,7 +105,8 @@ def run():
             updated_count = batch_update(edited_rows, df)
             st.success(f"✅ 已儲存 {updated_count} 筆變更")
 
-        if isinstance(selected, list) and selected:
+        # 批次操作區塊
+        if isinstance(selected, list) and len(selected) > 0:
             try:
                 selected_ids = [row['id'] for row in selected if not row.get("is_admin", False)]
                 if selected_ids:
@@ -120,5 +121,4 @@ def run():
                 st.error(f"❌ 處理選取帳號錯誤：{e}")
         else:
             st.info("📌 可勾選要批次操作的帳號")
-    else:
-        st.warning("⚠️ 尚無帳號資料")
+
