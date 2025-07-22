@@ -1,124 +1,107 @@
 import streamlit as st
-import pandas as pd
 import requests
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
+from frontend.components.auth import is_admin_user
+from frontend.components.nav import nav_page
+from core.config import API_BASE
+
+# 中文欄位名稱對照
+COLUMN_RENAMES = {
+    "id": "ID",
+    "username": "使用者帳號",
+    "is_admin": "是否為管理員",
+    "is_active": "使用者狀況",
+    "note": "備註"
+}
+
+STATUS_OPTIONS = ["啟用", "停用", "刪除"]
+
+# 狀態與布林值轉換
+status_to_bool = {"啟用": True, "停用": False, "刪除": "刪除"}
+bool_to_status = {True: "啟用", False: "停用"}
+
+# 🔁 取得所有使用者資料
+def get_users():
+    res = requests.get(f"{API_BASE}/users")
+    if res.status_code == 200:
+        return res.json()
+    else:
+        st.error("無法取得使用者資料")
+        return []
+
+# 💾 儲存變更（單筆）
+def update_user(user):
+    uid = user["id"]
+    status_value = user["使用者狀況"]
+
+    if status_value == "刪除":
+        res = requests.delete(f"{API_BASE}/delete_user/{uid}")
+    else:
+        payload = {
+            "note": user["備註"],
+            "is_admin": user["是否為管理員"],
+            "is_active": status_to_bool[status_value]
+        }
+        res = requests.put(f"{API_BASE}/update_user/{uid}", json=payload)
+    return res.status_code
+
+# 🔐 權限檢查 + 主邏輯
 
 def run():
-    st.set_page_config(page_title="帳號管理", layout="wide")
-    st.title("🔐 帳號管理")
+    st.title("帳號管理 👥")
 
-    API_URL = "https://ocr-whisper-production-2.up.railway.app"
+    # 返回鍵
+    if st.button("← 返回首頁"):
+        nav_page("首頁")
 
-    def fetch_users():
-        try:
-            res = requests.get(f"{API_URL}/users")
-            return res.json()
-        except Exception as e:
-            st.error(f"❌ 無法取得使用者資料：{e}")
-            return []
+    if not is_admin_user():
+        st.warning("⛔️ 僅限管理員使用")
+        return
 
-    def update_user(user_id, updated_data):
-        try:
-            res = requests.put(f"{API_URL}/update_user/{user_id}", json=updated_data)
-            return res.status_code == 200
-        except:
-            return False
+    # 載入資料
+    users = get_users()
+    if not users:
+        return
 
-    def update_user_password(user_id, new_password):
-        try:
-            res = requests.put(f"{API_URL}/update_user_password/{user_id}", json={"new_password": new_password})
-            return res.status_code == 200
-        except:
-            return False
+    # 欄位轉換與整理
+    for u in users:
+        u["使用者帳號"] = u.pop("username")
+        u["是否為管理員"] = u.pop("is_admin")
+        u["使用者狀況"] = bool_to_status.get(u.pop("is_active"), "啟用")
+        u["備註"] = u.get("note", "")
 
-    def batch_update(users_df, original_df):
-        changes = []
-        for _, row in users_df.iterrows():
-            original = original_df[original_df['id'] == row['id']].iloc[0]
-            changed_fields = {}
-            for field in ['note', 'company', 'is_admin', 'is_active']:
-                if row[field] != original[field]:
-                    changed_fields[field] = row[field]
-            if changed_fields:
-                changes.append((row['id'], changed_fields))
-        for user_id, fields in changes:
-            update_user(user_id, fields)
-        return len(changes)
+    gb = GridOptionsBuilder.from_dataframe(
+        pd.DataFrame(users)[list(COLUMN_RENAMES.values())]
+    )
+    gb.configure_default_column(editable=False, resizable=True)
+    gb.configure_column("是否為管理員", editable=True)
+    gb.configure_column("備註", editable=True)
+    gb.configure_column(
+        "使用者狀況",
+        editable=True,
+        cellEditor="agSelectCellEditor",
+        cellEditorParams={"values": STATUS_OPTIONS},
+    )
+    gb.configure_grid_options(domLayout='normal')
 
-    def batch_action(user_ids, action):
-        count = 0
-        for uid in user_ids:
-            if action == "啟用帳號":
-                success = update_user(uid, {"is_active": True})
-            elif action == "停用帳號":
-                success = update_user(uid, {"is_active": False})
-            elif action == "刪除帳號":
-                res = requests.delete(f"{API_URL}/delete_user/{uid}")
-                success = res.status_code == 200
-            else:
+    grid_response = AgGrid(
+        pd.DataFrame(users)[list(COLUMN_RENAMES.values())],
+        gridOptions=gb.build(),
+        height=380,
+        update_mode=GridUpdateMode.VALUE_CHANGED,
+        allow_unsafe_jscode=True,
+        fit_columns_on_grid_load=True
+    )
+
+    updated_rows = grid_response["data"]
+
+    if st.button("💾 儲存變更"):
+        success = True
+        for row in updated_rows.to_dict(orient="records"):
+            code = update_user(row)
+            if code != 200:
                 success = False
-            if success:
-                count += 1
-        return count
-
-    search_keyword = st.text_input("🔍 搜尋帳號或 ID：")
-    users_data = fetch_users()
-
-    if users_data:
-        df = pd.DataFrame(users_data)
-
-        # 強制補齊欄位並轉換型別
-        expected_cols = ['id', 'username', 'note', 'company', 'is_admin', 'is_active']
-        for col in expected_cols:
-            if col not in df.columns:
-                df[col] = ""
-        df = df.reindex(columns=expected_cols)
-        df['is_admin'] = df['is_admin'].astype(bool)
-        df['is_active'] = df['is_active'].astype(bool)
-
-        if search_keyword:
-            df = df[df['username'].astype(str).str.contains(search_keyword, case=False) |
-                    df['id'].astype(str).str.contains(search_keyword)]
-
-        st.markdown("### 👥 使用者列表")
-
-        gb = GridOptionsBuilder.from_dataframe(df)
-        for col in ['note', 'company', 'is_admin', 'is_active']:
-            gb.configure_column(col, editable=True)
-        gb.configure_selection('multiple', use_checkbox=True)
-        gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
-        grid_options = gb.build()
-
-        grid_response = AgGrid(
-            df,
-            gridOptions=grid_options,
-            update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED,
-            allow_unsafe_jscode=True,
-            height=380,
-            fit_columns_on_grid_load=True
-        )
-
-        edited_rows = pd.DataFrame(grid_response["data"])
-        selected = grid_response.get("selected_rows", [])
-
-        if st.button("💾 儲存所有欄位修改"):
-            updated_count = batch_update(edited_rows, df)
-            st.success(f"✅ 已儲存 {updated_count} 筆變更")
-
-        if isinstance(selected, list) and selected:
-            try:
-                selected_ids = [row['id'] for row in selected if not row.get("is_admin", False)]
-                if selected_ids:
-                    st.markdown("### 🔧 批次操作")
-                    batch_opt = st.selectbox("選擇要執行的操作", ["啟用帳號", "停用帳號", "刪除帳號"])
-                    if st.button("執行批次操作"):
-                        count = batch_action(selected_ids, batch_opt)
-                        st.success(f"✅ 已對 {count} 筆帳號執行「{batch_opt}」操作")
-                else:
-                    st.warning("⚠️ 選取帳號中包含管理員，無法批次操作")
-            except Exception as e:
-                st.error(f"❌ 處理選取帳號錯誤：{e}")
+        if success:
+            st.success("✅ 所有變更已儲存！請重新登入以查看更新。")
         else:
-            st.info("📌 可勾選要批次操作的帳號")
-    else:
-        st.warning("⚠️ 尚無帳號資料")
+            st.error("⚠️ 有些變更未成功，請稍後再試或檢查資料。")
