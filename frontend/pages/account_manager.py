@@ -8,12 +8,13 @@ st.title("🔐 帳號管理")
 
 API_URL = "https://ocr-whisper-production-2.up.railway.app"
 
+# ========== 後端互動邏輯 ==========
 def fetch_users():
     try:
         res = requests.get(f"{API_URL}/users")
         return res.json()
     except Exception as e:
-        st.error(f"無法取得使用者資料：{e}")
+        st.error(f"❌ 無法取得使用者資料：{e}")
         return []
 
 def update_user(user_id, updated_data):
@@ -61,6 +62,7 @@ def batch_action(user_ids, action):
             count += 1
     return count
 
+# ========== 主頁面邏輯 ==========
 search_keyword = st.text_input("🔍 搜尋帳號或 ID：")
 users_data = fetch_users()
 
@@ -77,7 +79,7 @@ if users_data:
     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
     grid_options = gb.build()
 
-    st.markdown("### 使用者列表")
+    st.markdown("### 👥 使用者列表")
     grid_response = AgGrid(
         df,
         gridOptions=grid_options,
@@ -103,6 +105,6 @@ if users_data:
                 count = batch_action(selected_ids, batch_opt)
                 st.success(f"✅ 已對 {count} 筆帳號執行「{batch_opt}」操作")
         else:
-            st.warning("⚠️ 已選取帳號中包含管理員，不允許批次操作")
+            st.warning("⚠️ 已選取帳號中包含管理員，無法進行批次操作")
 else:
     st.warning("⚠️ 尚無帳號資料")
