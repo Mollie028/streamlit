@@ -86,7 +86,7 @@ def run():
             gridOptions=grid_options,
             update_mode=GridUpdateMode.MODEL_CHANGED | GridUpdateMode.SELECTION_CHANGED,
             allow_unsafe_jscode=True,
-            height=380,  # ✅ 固定表格高度，避免畫面跳動
+            height=380,
             fit_columns_on_grid_load=True
         )
 
@@ -97,9 +97,8 @@ def run():
             updated_count = batch_update(pd.DataFrame(edited_rows), df)
             st.success(f"✅ 已儲存 {updated_count} 筆變更")
 
-        # ✅ 改這一行：避免錯誤
-        if len(selected) > 0:
-            selected_ids = [row['id'] for row in selected if not row.get("is_admin", False)]
+        if selected:
+            selected_ids = [row['id'] for row in selected if isinstance(row, dict) and not row.get("is_admin", False)]
             if selected_ids:
                 st.markdown("### 🔧 批次操作")
                 batch_opt = st.selectbox("選擇要執行的操作", ["啟用帳號", "停用帳號", "刪除帳號"])
@@ -108,5 +107,7 @@ def run():
                     st.success(f"✅ 已對 {count} 筆帳號執行「{batch_opt}」操作")
             else:
                 st.warning("⚠️ 已選取帳號中包含管理員，無法進行批次操作")
+        else:
+            st.info("ℹ️ 請先選取要操作的帳號")
     else:
         st.warning("⚠️ 尚無帳號資料")
