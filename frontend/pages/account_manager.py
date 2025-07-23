@@ -62,7 +62,7 @@ def run():
 
     if st.button("💾 儲存變更"):
         for i, row in updated_df.iterrows():
-            original = df.loc[i]
+            original = df.iloc[i]
             if not is_admin:
                 continue
 
