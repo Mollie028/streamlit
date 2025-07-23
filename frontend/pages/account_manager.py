@@ -91,6 +91,7 @@ def run():
             fit_columns_on_grid_load=True,
             editable=True,
             single_click_edit=True  # ✅ 手機點一下就能編輯
+            reload_data=True
         )
 
         edited_df = pd.DataFrame(grid_response["data"])
@@ -99,8 +100,8 @@ def run():
 
         if st.button("儲存變更"):
             change_count = 0
-            for i, row in edited_df.iterrows():
-                original_row = df.iloc[i]
+            for row_idx, row in edited_df.iterrows():
+                original_row = df.iloc[row_idx]  # ✅ 確保使用正確的整數 index
                 if not row.equals(original_row):
                     user_id = row["ID"]
                     updated_data = {
@@ -114,6 +115,7 @@ def run():
                 st.success(f"✅ 成功儲存 {change_count} 筆變更")
             else:
                 st.info("沒有資料變更")
+
 
     # 👉 底部功能列：返回首頁 + 登出
     st.markdown("---")
