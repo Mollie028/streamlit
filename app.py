@@ -8,8 +8,6 @@ st.set_page_config(page_title="名片辨識系統", layout="centered")
 if "current_page" not in st.session_state:
     st.session_state["current_page"] = "login"
 
-# ✅（已移除上方全域登出按鈕）
-
 # ------------------------
 # 登入頁面
 # ------------------------
@@ -121,20 +119,24 @@ elif st.session_state["current_page"] == "home":
             st.rerun()
 
 # ------------------------
-# 各功能導向
+# 各功能導向（延遲載入）
 # ------------------------
 elif st.session_state["current_page"] == "account_manage":
-    import frontend.pages.account_manager as acc_page
+    import importlib
+    acc_page = importlib.import_module("frontend.pages.account_manager")
     acc_page.run()
 
 elif st.session_state["current_page"] == "add_card":
-    import frontend.pages.add_card as add_page
+    import importlib
+    add_page = importlib.import_module("frontend.pages.add_card")
     add_page.run()
 
 elif st.session_state["current_page"] == "card_list":
-    import frontend.pages.card_list as card_page
+    import importlib
+    card_page = importlib.import_module("frontend.pages.card_list")
     card_page.run()
 
 elif st.session_state["current_page"] == "change_password":
-    import frontend.pages.change_password as change_page
+    import importlib
+    change_page = importlib.import_module("frontend.pages.change_password")
     change_page.run()
