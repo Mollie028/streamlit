@@ -61,11 +61,14 @@ def run():
     updated_df = grid["data"]
 
     if st.button("💾 儲存變更"):
-        for i, row in updated_df.iterrows():
-            original = df.iloc[i]
+        for _, row in updated_df.iterrows():
             if not is_admin:
                 continue
 
+            # 根據 ID 找回原本那筆資料（這樣比 iloc 安全）
+            original = df[df["ID"] == row["ID"]].iloc[0]
+
+            # 比對有無變更
             if row.to_dict() != original.to_dict():
                 user_id = row["ID"]
                 new_data = {
@@ -80,7 +83,7 @@ def run():
                         requests.put(f"{API_BASE}/disable_user/{user_id}", headers={"Authorization": f"Bearer {token}"})
                     elif row["使用者狀況"] == "刪除":
                         requests.delete(f"{API_BASE}/delete_user/{user_id}", headers={"Authorization": f"Bearer {token}"})
-                        continue
+                        continue  # 不再更新其他欄位
 
                 res = requests.put(f"{API_BASE}/update_user/{user_id}", json=new_data, headers={"Authorization": f"Bearer {token}"})
                 if res.status_code != 200:
@@ -88,6 +91,7 @@ def run():
 
         st.success("✅ 變更已儲存")
         st.rerun()
+
 
     # 底部功能列：返回主頁／登出
     st.markdown("---")
