@@ -103,7 +103,6 @@ def run():
                 old_row = df.iloc[i]
                 new_row = edited_df.iloc[i]
         
-                # 比較有變更才更新
                 if (
                     old_row["使用者狀況"] != new_row["使用者狀況"]
                     or old_row["是否為管理員"] != new_row["是否為管理員"]
@@ -111,9 +110,9 @@ def run():
                 ):
                     user_id = new_row["ID"]
                     updated_data = {
-                        "note": new_row["備註"],
-                        "is_admin": new_row["是否為管理員"],
-                        "is_active": new_row["使用者狀況"] == "啟用"
+                        "note": str(new_row["備註"]) if pd.notna(new_row["備註"]) else "",
+                        "is_admin": bool(new_row["是否為管理員"]),
+                        "is_active": True if new_row["使用者狀況"] == "啟用" else False
                     }
                     if update_user(user_id, updated_data):
                         change_count += 1
