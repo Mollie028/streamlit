@@ -90,10 +90,6 @@ def add_card_page():
         st.success(f"✅ 成功送出 {success} 筆資料！")
         st.session_state["extracted_results"] = []
 
-    if st.button("🔙 返回首頁"):
-        st.session_state["current_page"] = "home"
-        st.rerun()
-
 
 def process_and_store(filename, image_bytes):
     try:
@@ -142,3 +138,17 @@ def run():
     except Exception as e:
         st.error("❌ 名片新增頁面載入失敗")
         st.code(str(e))
+
+    # 👉 底部功能列：返回首頁 + 登出
+    st.markdown("---")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔙 返回首頁"):
+            st.session_state["current_page"] = "home"
+            st.rerun()
+    with col2:
+        if st.button("🚪 登出"):
+            st.session_state.clear()
+            st.session_state["current_page"] = "login"
+            st.rerun()
+
