@@ -8,12 +8,7 @@ st.set_page_config(page_title="名片辨識系統", layout="centered")
 if "current_page" not in st.session_state:
     st.session_state["current_page"] = "login"
 
-# 登出按鈕
-if st.session_state.get("access_token") and st.session_state["current_page"] != "login":
-    if st.button("🔓 登出"):
-        st.session_state.clear()
-        st.session_state["current_page"] = "login"
-        st.rerun()
+# ✅（已移除上方全域登出按鈕）
 
 # ------------------------
 # 登入頁面
@@ -42,7 +37,6 @@ if st.session_state["current_page"] == "login":
                         "is_admin": result.get("role", "user") == "admin"
                     }
 
-                    # ✅ 新增：給各頁共用的使用者資訊
                     st.session_state["user"] = {
                         "id": result.get("id"),
                         "username": username,
@@ -131,7 +125,7 @@ elif st.session_state["current_page"] == "home":
 # ------------------------
 elif st.session_state["current_page"] == "account_manage":
     import frontend.pages.account_manager as acc_page
-    acc_page.run()    
+    acc_page.run()
 
 elif st.session_state["current_page"] == "add_card":
     import frontend.pages.add_card as add_page
