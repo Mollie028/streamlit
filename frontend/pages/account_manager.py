@@ -4,7 +4,7 @@ import requests
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from services.auth_service import is_logged_in, logout_button
 
-# ✅ backend_url 提到外層
+# ✅ 提到外層，避免作用域錯誤
 backend_url = "https://ocr-whisper-production-2.up.railway.app"
 
 def update_user(user_id, data):
@@ -36,7 +36,6 @@ def run():
     st.markdown("## 👥 帳號管理")
     st.markdown("### 使用者帳號列表")
 
-    # 取得使用者列表
     @st.cache_data(ttl=60)
     def get_user_list():
         try:
@@ -90,8 +89,8 @@ def run():
             height=380,
             fit_columns_on_grid_load=True,
             editable=True,
-            single_click_edit=True  # ✅ 手機點一下就能編輯
-            reload_data=True
+            single_click_edit=True,
+            reload_data=True  # ✅ 幫助手機觸控生效
         )
 
         edited_df = pd.DataFrame(grid_response["data"])
@@ -101,7 +100,7 @@ def run():
         if st.button("儲存變更"):
             change_count = 0
             for row_idx, row in edited_df.iterrows():
-                original_row = df.iloc[row_idx]  # ✅ 確保使用正確的整數 index
+                original_row = df.iloc[row_idx]  # ✅ 用 iloc 比對整數 index
                 if not row.equals(original_row):
                     user_id = row["ID"]
                     updated_data = {
@@ -115,7 +114,6 @@ def run():
                 st.success(f"✅ 成功儲存 {change_count} 筆變更")
             else:
                 st.info("沒有資料變更")
-
 
     # 👉 底部功能列：返回首頁 + 登出
     st.markdown("---")
