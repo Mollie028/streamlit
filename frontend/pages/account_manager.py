@@ -99,8 +99,16 @@ def run():
 
         if st.button("儲存變更"):
             change_count = 0
-            for (_, old_row), (_, new_row) in zip(df.iterrows(), edited_df.iterrows()):
-                if not new_row.equals(old_row):
+            for i in range(len(df)):
+                old_row = df.iloc[i]
+                new_row = edited_df.iloc[i]
+        
+                # 比較有變更才更新
+                if (
+                    old_row["使用者狀況"] != new_row["使用者狀況"]
+                    or old_row["是否為管理員"] != new_row["是否為管理員"]
+                    or old_row["備註"] != new_row["備註"]
+                ):
                     user_id = new_row["ID"]
                     updated_data = {
                         "note": new_row["備註"],
@@ -109,10 +117,12 @@ def run():
                     }
                     if update_user(user_id, updated_data):
                         change_count += 1
+        
             if change_count > 0:
                 st.success(f"✅ 成功儲存 {change_count} 筆變更")
             else:
                 st.info("沒有資料變更")
+
 
 
     # 👉 底部功能列：返回首頁 + 登出
