@@ -4,6 +4,25 @@ import requests
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from services.auth_service import is_logged_in, logout_button
 
+# ✅ backend_url 提到外層
+backend_url = "https://ocr-whisper-production-2.up.railway.app"
+
+def update_user(user_id, data):
+    try:
+        response = requests.put(
+            f"{backend_url}/update_user/{user_id}",
+            json=data,
+            headers={"Authorization": f"Bearer {st.session_state['access_token']}"}
+        )
+        if response.status_code == 200:
+            return True
+        else:
+            st.error(f"更新失敗（ID: {user_id}）：{response.text}")
+            return False
+    except Exception as e:
+        st.error(f"更新時發生錯誤：{e}")
+        return False
+
 def run():
     st.set_page_config(page_title="帳號管理", page_icon="👥")
 
@@ -11,14 +30,11 @@ def run():
     if not is_logged_in():
         st.error("請先登入以使用本頁面。")
         st.stop()
-
     logout_button()
     # ============================
 
     st.markdown("## 👥 帳號管理")
     st.markdown("### 使用者帳號列表")
-
-    backend_url = "https://ocr-whisper-production-2.up.railway.app"
 
     # 取得使用者列表
     @st.cache_data(ttl=60)
@@ -64,7 +80,7 @@ def run():
         gb.configure_column("備註", editable=True)
 
         grid_options = gb.build()
-        
+
         grid_response = AgGrid(
             df,
             gridOptions=grid_options,
@@ -73,53 +89,32 @@ def run():
             theme="streamlit",
             height=380,
             fit_columns_on_grid_load=True,
-            enable_enterprise_modules=False,
-            editable=True,  # 可以加上這行增加兼容性
-            single_click_edit=True  # ✅ 加這一行
+            editable=True,
+            single_click_edit=True  # ✅ 手機點一下就能編輯
         )
 
-        
-
-        updated_rows = grid_response["data"]
-        edited_df = pd.DataFrame(updated_rows)
+        edited_df = pd.DataFrame(grid_response["data"])
 
         st.markdown("#### 📥 點選表格進行編輯，完成後按下「儲存變更」")
 
         if st.button("儲存變更"):
-            updated_df = grid_response['data']
-            edited_rows = updated_df[updated_df != df].dropna(how='all')
-        
-            if not edited_rows.empty:
-                for index, row in updated_df.iterrows():
+            change_count = 0
+            for i, row in edited_df.iterrows():
+                original_row = df.iloc[i]
+                if not row.equals(original_row):
                     user_id = row["ID"]
                     updated_data = {
                         "note": row["備註"],
                         "is_admin": row["是否為管理員"],
-                        "is_active": True if row["使用者狀況"] == "啟用" else False
+                        "is_active": row["使用者狀況"] == "啟用"
                     }
-                    # 呼叫更新 API
-                    update_user(user_id, updated_data)
-                st.success("變更已儲存 ✅")
+                    if update_user(user_id, updated_data):
+                        change_count += 1
+            if change_count > 0:
+                st.success(f"✅ 成功儲存 {change_count} 筆變更")
             else:
                 st.info("沒有資料變更")
-            
-def update_user(user_id, data):
-    try:
-        response = requests.put(
-            f"{backend_url}/update_user/{user_id}",
-            json=data,
-            headers={"Authorization": f"Bearer {st.session_state['access_token']}"}
-        )
-        if response.status_code == 200:
-            return True
-        else:
-            st.error(f"更新失敗（ID: {user_id}）：{response.text}")
-            return False
-    except Exception as e:
-        st.error(f"更新時發生錯誤：{e}")
-        return False
 
-    
     # 👉 底部功能列：返回首頁 + 登出
     st.markdown("---")
     col1, col2 = st.columns(2)
