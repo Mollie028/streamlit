@@ -6,7 +6,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 st.set_page_config(page_title="帳號管理", page_icon="👥")
 
 # ====== 登入檢查與登出 ======
-from frontend.components.auth import is_logged_in, logout_button
+from services.auth_service import is_logged_in, logout_button
 
 if not is_logged_in():
     st.error("請先登入以使用本頁面。")
