@@ -1,13 +1,10 @@
-import sys
 import os
-import streamlit as st  # ✅ 新增：用於登入狀態與登出按鈕
+import streamlit as st
 import requests
 import psycopg2
 from core.config import API_BASE
 
-# 如果有需要加上資料庫連線字串，可從環境變數或 config 中載入
-# 這裡假設你自己有設定 DB_URL（若沒設定會報錯）
-DB_URL = os.getenv("DB_URL")  # ✅ 可自訂為你的資料庫連線字串
+DB_URL = os.getenv("DB_URL")
 
 # ✅ 建立新帳號
 def create_user(username, password, company_name=None, is_admin=False):
@@ -26,7 +23,7 @@ def create_user(username, password, company_name=None, is_admin=False):
     except Exception as e:
         return f"例外錯誤：{str(e)}"
 
-# ✅ 登入驗證
+# ✅ 登入驗證 + 寫入 token 與 user_info
 def check_login(username, password):
     try:
         res = requests.post(
@@ -36,21 +33,23 @@ def check_login(username, password):
         if res.status_code == 200:
             data = res.json()
 
-            # ✅ 登入成功後，存入 access_token
+            # ✅ 儲存 access_token 給 API 使用
             st.session_state["access_token"] = data["access_token"]
 
-            return {
+            # ✅ 儲存登入者資訊給 is_logged_in() 判斷用
+            st.session_state["user_info"] = {
+                "username": username,
                 "role": data.get("role", "user"),
-                "company_name": data.get("company_name", ""),
-                "username": username
+                "company_name": data.get("company_name", "")
             }
+
+            return st.session_state["user_info"]
         else:
             print("❌ 登入失敗：", res.text)
             return None
     except Exception as e:
         print("❌ 登入 API 錯誤：", e)
         return None
-ne
 
 # ✅ 測試資料庫連線
 def test_db_connection():
@@ -70,7 +69,6 @@ def is_logged_in():
     if isinstance(user_info, dict) and "username" in user_info:
         return user_info
     return None
-
 
 # ✅ 登出按鈕
 def logout_button():
