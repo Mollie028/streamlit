@@ -131,7 +131,7 @@ elif st.session_state["current_page"] == "home":
 # ------------------------
 elif st.session_state["current_page"] == "account_manage":
     import frontend.pages.account_manager as acc_page
-    acc_page.run()
+    acc_page.run()    
 
 elif st.session_state["current_page"] == "add_card":
     import frontend.pages.add_card as add_page
