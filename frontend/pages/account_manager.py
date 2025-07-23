@@ -68,12 +68,16 @@ def run():
         grid_response = AgGrid(
             df,
             gridOptions=grid_options,
-            update_mode=GridUpdateMode.MODEL_CHANGED,  
+            update_mode=GridUpdateMode.MODEL_CHANGED,
             allow_unsafe_jscode=True,
             theme="streamlit",
             height=380,
             fit_columns_on_grid_load=True,
+            enable_enterprise_modules=False,
+            editable=True,  # 可以加上這行增加兼容性
+            single_click_edit=True  # ✅ 加這一行
         )
+
         
 
         updated_rows = grid_response["data"]
@@ -98,4 +102,33 @@ def run():
                 st.success("變更已儲存 ✅")
             else:
                 st.info("沒有資料變更")
+            
+def update_user(user_id, data):
+    try:
+        response = requests.put(
+            f"{backend_url}/update_user/{user_id}",
+            json=data,
+            headers={"Authorization": f"Bearer {st.session_state['access_token']}"}
+        )
+        if response.status_code == 200:
+            return True
+        else:
+            st.error(f"更新失敗（ID: {user_id}）：{response.text}")
+            return False
+    except Exception as e:
+        st.error(f"更新時發生錯誤：{e}")
+        return False
 
+    
+    # 👉 底部功能列：返回首頁 + 登出
+    st.markdown("---")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔙 返回首頁"):
+            st.session_state["current_page"] = "home"
+            st.rerun()
+    with col2:
+        if st.button("🚪 登出"):
+            st.session_state.clear()
+            st.session_state["current_page"] = "login"
+            st.rerun()
