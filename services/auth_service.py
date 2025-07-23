@@ -59,7 +59,12 @@ def test_db_connection():
 
 # ✅ 登入狀態檢查
 def is_logged_in():
-    return 'access_token' in st.session_state and st.session_state['access_token'] != ""
+    """回傳使用者登入資訊（dict），若未登入則回傳 None"""
+    user_info = st.session_state.get("user_info")
+    if isinstance(user_info, dict) and "username" in user_info:
+        return user_info
+    return None
+
 
 # ✅ 登出按鈕
 def logout_button():
