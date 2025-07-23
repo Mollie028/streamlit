@@ -64,47 +64,38 @@ def run():
         gb.configure_column("備註", editable=True)
 
         grid_options = gb.build()
-
+        
         grid_response = AgGrid(
             df,
             gridOptions=grid_options,
-            update_mode=GridUpdateMode.MANUAL,
+            update_mode=GridUpdateMode.MODEL_CHANGED,  
             allow_unsafe_jscode=True,
             theme="streamlit",
             height=380,
             fit_columns_on_grid_load=True,
         )
+        
 
         updated_rows = grid_response["data"]
         edited_df = pd.DataFrame(updated_rows)
 
         st.markdown("#### 📥 點選表格進行編輯，完成後按下「儲存變更」")
 
-        if st.button("💾 儲存變更"):
-            for idx, row in edited_df.iterrows():
-                user_id = row["ID"]
-                original = df[df["ID"] == user_id].iloc[0]
+        if st.button("儲存變更"):
+            updated_df = grid_response['data']
+            edited_rows = updated_df[updated_df != df].dropna(how='all')
+        
+            if not edited_rows.empty:
+                for index, row in updated_df.iterrows():
+                    user_id = row["ID"]
+                    updated_data = {
+                        "note": row["備註"],
+                        "is_admin": row["是否為管理員"],
+                        "is_active": True if row["使用者狀況"] == "啟用" else False
+                    }
+                    # 呼叫更新 API
+                    update_user(user_id, updated_data)
+                st.success("變更已儲存 ✅")
+            else:
+                st.info("沒有資料變更")
 
-                # 狀態處理
-                if row["使用者狀況"] != original["使用者狀況"]:
-                    action = row["使用者狀況"]
-                    if action == "啟用":
-                        requests.put(f"{backend_url}/enable_user/{user_id}", headers={"Authorization": f"Bearer {st.session_state['access_token']}"})
-                    elif action == "停用":
-                        requests.put(f"{backend_url}/disable_user/{user_id}", headers={"Authorization": f"Bearer {st.session_state['access_token']}"})
-                    elif action == "刪除":
-                        requests.delete(f"{backend_url}/delete_user/{user_id}", headers={"Authorization": f"Bearer {st.session_state['access_token']}"})
-
-                # 備註更新
-                if row["備註"] != original["備註"]:
-                    requests.put(
-                        f"{backend_url}/update_user/{user_id}",
-                        json={"note": row["備註"]},
-                        headers={"Authorization": f"Bearer {st.session_state['access_token']}"}
-                    )
-
-            st.success("✅ 已成功儲存所有變更！")
-            st.cache_data.clear()
-            st.rerun()
-    else:
-        st.info("目前尚無使用者資料。")
