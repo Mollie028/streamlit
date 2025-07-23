@@ -31,7 +31,7 @@ def run():
 
     df = df[["id", "username", "is_admin", "is_active", "note"]]
     df.columns = ["ID", "使用者帳號", "是否為管理員", "使用者狀況", "備註"]
-
+    df.reset_index(drop=True, inplace=True)
     df["是否為管理員"] = df["是否為管理員"].astype(bool)
     df["使用者狀況"] = df["使用者狀況"].map({True: "啟用", False: "停用"})
 
