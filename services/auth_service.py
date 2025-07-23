@@ -35,9 +35,14 @@ def check_login(username, password):
         )
         if res.status_code == 200:
             data = res.json()
+
+            # ✅ 登入成功後，存入 access_token
+            st.session_state["access_token"] = data["access_token"]
+
             return {
                 "role": data.get("role", "user"),
-                "company_name": data.get("company_name", "")
+                "company_name": data.get("company_name", ""),
+                "username": username
             }
         else:
             print("❌ 登入失敗：", res.text)
@@ -45,6 +50,7 @@ def check_login(username, password):
     except Exception as e:
         print("❌ 登入 API 錯誤：", e)
         return None
+ne
 
 # ✅ 測試資料庫連線
 def test_db_connection():
