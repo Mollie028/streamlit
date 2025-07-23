@@ -60,37 +60,51 @@ def run():
 
     updated_df = grid["data"]
 
-    if st.button("💾 儲存變更"):
-        for _, row in updated_df.iterrows():
-            if not is_admin:
-                continue
+if st.button("💾 儲存變更"):
+    token = st.session_state.get("access_token", "")
+    success_count = 0
 
-            # 根據 ID 找回原本那筆資料（這樣比 iloc 安全）
-            original = df[df["ID"] == row["ID"]].iloc[0]
+    for _, row in updated_df.iterrows():
+        if not is_admin:
+            continue
 
-            # 比對有無變更
-            if row.to_dict() != original.to_dict():
-                user_id = row["ID"]
-                new_data = {
-                    "is_admin": row["是否為管理員"],
-                    "note": row["備註"],
-                }
+        # 根據 ID 找原始資料
+        original = df[df["ID"] == row["ID"]].iloc[0]
+        user_id = row["ID"]
+        changed = False
 
-                if row["使用者狀況"] != original["使用者狀況"]:
-                    if row["使用者狀況"] == "啟用":
-                        requests.put(f"{API_BASE}/enable_user/{user_id}", headers={"Authorization": f"Bearer {token}"})
-                    elif row["使用者狀況"] == "停用":
-                        requests.put(f"{API_BASE}/disable_user/{user_id}", headers={"Authorization": f"Bearer {token}"})
-                    elif row["使用者狀況"] == "刪除":
-                        requests.delete(f"{API_BASE}/delete_user/{user_id}", headers={"Authorization": f"Bearer {token}"})
-                        continue  # 不再更新其他欄位
+        # 比對狀態（啟用／停用／刪除）
+        if row["使用者狀況"] != original["使用者狀況"]:
+            status = row["使用者狀況"]
+            if status == "啟用":
+                requests.put(f"{API_BASE}/enable_user/{user_id}", headers={"Authorization": f"Bearer {token}"})
+            elif status == "停用":
+                requests.put(f"{API_BASE}/disable_user/{user_id}", headers={"Authorization": f"Bearer {token}"})
+            elif status == "刪除":
+                requests.delete(f"{API_BASE}/delete_user/{user_id}", headers={"Authorization": f"Bearer {token}"})
+                continue  # 刪除就不用送更新資料
+            changed = True
 
-                res = requests.put(f"{API_BASE}/update_user/{user_id}", json=new_data, headers={"Authorization": f"Bearer {token}"})
-                if res.status_code != 200:
-                    st.error(f"更新失敗：{row['使用者帳號']}")
+        # 比對管理員權限與備註欄位
+        update_payload = {}
+        if row["是否為管理員"] != original["是否為管理員"]:
+            update_payload["is_admin"] = row["是否為管理員"]
+            changed = True
+        if row["備註"] != original["備註"]:
+            update_payload["note"] = row["備註"]
+            changed = True
 
-        st.success("✅ 變更已儲存")
-        st.rerun()
+        # 若有需更新欄位，就送出
+        if update_payload:
+            res = requests.put(f"{API_BASE}/update_user/{user_id}", json=update_payload, headers={"Authorization": f"Bearer {token}"})
+            if res.status_code != 200:
+                st.error(f"❌ 更新失敗：{row['使用者帳號']}")
+            else:
+                success_count += 1
+
+    st.success(f"✅ 成功儲存 {success_count} 筆變更！")
+    st.rerun()
+
 
 
     # 底部功能列：返回主頁／登出
