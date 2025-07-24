@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import requests
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-from st_aggrid.shared import JsCode
 from services.auth_service import is_logged_in, logout_button
 
 backend_url = "https://ocr-whisper-production-2.up.railway.app"
@@ -16,15 +15,25 @@ def update_user(user_id, data):
         )
         return response.status_code == 200
     except Exception as e:
-        st.error(f"更新錯誤：{e}")
+        st.error(f"更新時發生錯誤：{e}")
         return False
 
-def update_password(user_id, new_pwd, old_pwd=None):
+def delete_user(user_id):
     try:
-        payload = {"new_password": new_pwd}
-        if old_pwd:
-            payload["old_password"] = old_pwd
+        response = requests.delete(
+            f"{backend_url}/delete_user/{user_id}",
+            headers={"Authorization": f"Bearer {st.session_state['access_token']}"}
+        )
+        return response.status_code == 200
+    except Exception as e:
+        st.error(f"刪除錯誤：{e}")
+        return False
 
+def update_password(user_id, new_password, old_password=None):
+    payload = {"new_password": new_password}
+    if old_password:
+        payload["old_password"] = old_password
+    try:
         res = requests.put(
             f"{backend_url}/update_user_password/{user_id}",
             json=payload,
@@ -34,29 +43,19 @@ def update_password(user_id, new_pwd, old_pwd=None):
     except Exception as e:
         return False, str(e)
 
-def delete_user(user_id):
-    try:
-        res = requests.delete(
-            f"{backend_url}/delete_user/{user_id}",
-            headers={"Authorization": f"Bearer {st.session_state['access_token']}"}
-        )
-        return res.status_code == 200, res.text
-    except Exception as e:
-        return False, str(e)
-
 def run():
     st.set_page_config(page_title="帳號管理", page_icon="👥")
 
-    user_info = is_logged_in()
-    if not user_info:
+    if not is_logged_in():
         st.error("請先登入以使用本頁面。")
         st.stop()
     logout_button()
 
-    is_admin = user_info.get("role") == "admin"
-
     st.markdown("## 👥 帳號管理")
     st.markdown("### 使用者帳號列表")
+
+    current_user = st.session_state.get("user_info", {})
+    is_admin = current_user.get("role") == "admin"
 
     @st.cache_data(ttl=60)
     def get_user_list():
@@ -67,9 +66,11 @@ def run():
             )
             if response.status_code == 200:
                 return response.json()
-            return []
+            else:
+                st.error("無法取得使用者資料。")
+                return []
         except Exception as e:
-            st.error(f"取得使用者失敗：{e}")
+            st.error(f"發生錯誤：{e}")
             return []
 
     users = get_user_list()
@@ -90,18 +91,13 @@ def run():
         gb = GridOptionsBuilder.from_dataframe(df)
         gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=5)
         gb.configure_default_column(wrapText=True, autoHeight=True)
-
         gb.configure_column("ID", editable=False, pinned="left", width=80)
         gb.configure_column("使用者帳號", editable=False, pinned="left", width=160)
-        gb.configure_column("是否為管理員", editable=is_admin, cellEditor='agSelectCellEditor',
-                            cellEditorParams={'values': [True, False]}, width=100)
+        gb.configure_column("是否為管理員", editable=False, width=100)
 
-        # ✅ 決定下拉選單項目
+        status_options = ["啟用", "停用"]
         if is_admin:
-            status_options = ["啟用", "停用", "刪除"]
-        else:
-            status_options = ["啟用", "停用"]
-
+            status_options.append("刪除")
         gb.configure_column("使用者狀況", editable=True, cellEditor='agSelectCellEditor',
                             cellEditorParams={'values': status_options}, width=100)
         gb.configure_column("備註", editable=True)
@@ -132,14 +128,12 @@ def run():
                 new_row = edited_df.iloc[i]
                 user_id = new_row["ID"]
 
-                if new_row["使用者狀況"] == "刪除":
-                    if is_admin and user_info["username"] != new_row["使用者帳號"]:
-                        success, msg = delete_user(user_id)
-                        if success:
-                            st.success(f"✅ 已刪除帳號 {new_row['使用者帳號']}")
-                            st.rerun()
-                        else:
-                            st.error(f"❌ 刪除失敗：{msg}")
+                if new_row["使用者狀況"] == "刪除" and is_admin and current_user.get("username") != new_row["使用者帳號"]:
+                    if delete_user(user_id):
+                        st.success(f"✅ 已刪除帳號 {new_row['使用者帳號']}")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ 刪除失敗：{new_row['使用者帳號']}")
                     continue
 
                 if (
@@ -160,28 +154,29 @@ def run():
             else:
                 st.info("沒有資料變更")
 
-        selected_row = grid_response["selected_rows"]
-        if selected_row:
-            selected_user = selected_row[0]
-            with st.expander(f"🔒 修改密碼 - {selected_user['使用者帳號']}（ID: {selected_user['ID']}）", expanded=True):
-                new_pwd = st.text_input("新密碼", type="password", key="new_pwd")
-                confirm_pwd = st.text_input("確認新密碼", type="password", key="confirm_pwd")
-                old_pwd = None
+        selected = grid_response.get("selected_rows", [])
+        if selected:
+            selected_user = selected[0]
+            st.markdown("---")
+            st.markdown(f"### 🔒 修改密碼 - 使用者：{selected_user['使用者帳號']}")
+            new_pwd = st.text_input("請輸入新密碼", type="password")
+            confirm_pwd = st.text_input("再次確認新密碼", type="password")
+            old_pwd = None
 
-                if user_info["username"] == selected_user["使用者帳號"]:
-                    old_pwd = st.text_input("舊密碼", type="password", key="old_pwd")
+            if current_user.get("username") == selected_user["使用者帳號"]:
+                old_pwd = st.text_input("請輸入舊密碼（僅本人）", type="password")
 
-                if st.button("✅ 送出修改密碼"):
-                    if not new_pwd or not confirm_pwd:
-                        st.warning("請填寫新密碼與確認密碼")
-                    elif new_pwd != confirm_pwd:
-                        st.warning("兩次密碼不一致")
+            if st.button("✅ 送出密碼修改"):
+                if not new_pwd or not confirm_pwd:
+                    st.warning("請填寫所有欄位")
+                elif new_pwd != confirm_pwd:
+                    st.warning("兩次密碼不一致")
+                else:
+                    ok, msg = update_password(selected_user["ID"], new_pwd, old_pwd)
+                    if ok:
+                        st.success("✅ 密碼修改成功")
                     else:
-                        success, msg = update_password(selected_user["ID"], new_pwd, old_pwd)
-                        if success:
-                            st.success("✅ 密碼修改成功")
-                        else:
-                            st.error(f"❌ 修改失敗：{msg}")
+                        st.error(f"❌ 密碼修改失敗：{msg}")
 
     st.markdown("---")
     col1, col2 = st.columns(2)
