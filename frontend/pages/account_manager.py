@@ -96,9 +96,11 @@ def run():
         gb.configure_column("是否為管理員", editable=is_admin, cellEditor='agSelectCellEditor',
                             cellEditorParams={'values': [True, False]}, width=100)
 
-        status_options = ["啟用", "停用"]
+        # ✅ 決定下拉選單項目
         if is_admin:
-            status_options.append("刪除")
+            status_options = ["啟用", "停用", "刪除"]
+        else:
+            status_options = ["啟用", "停用"]
 
         gb.configure_column("使用者狀況", editable=True, cellEditor='agSelectCellEditor',
                             cellEditorParams={'values': status_options}, width=100)
