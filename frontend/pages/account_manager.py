@@ -34,6 +34,16 @@ def update_password(user_id, new_pwd, old_pwd=None):
     except Exception as e:
         return False, str(e)
 
+def delete_user(user_id):
+    try:
+        res = requests.delete(
+            f"{backend_url}/delete_user/{user_id}",
+            headers={"Authorization": f"Bearer {st.session_state['access_token']}"}
+        )
+        return res.status_code == 200, res.text
+    except Exception as e:
+        return False, str(e)
+
 def run():
     st.set_page_config(page_title="帳號管理", page_icon="👥")
 
@@ -85,8 +95,13 @@ def run():
         gb.configure_column("使用者帳號", editable=False, pinned="left", width=160)
         gb.configure_column("是否為管理員", editable=is_admin, cellEditor='agSelectCellEditor',
                             cellEditorParams={'values': [True, False]}, width=100)
+
+        status_options = ["啟用", "停用"]
+        if is_admin:
+            status_options.append("刪除")
+
         gb.configure_column("使用者狀況", editable=True, cellEditor='agSelectCellEditor',
-                            cellEditorParams={'values': ["啟用", "停用"]}, width=100)
+                            cellEditorParams={'values': status_options}, width=100)
         gb.configure_column("備註", editable=True)
 
         grid_options = gb.build()
@@ -113,13 +128,23 @@ def run():
             for i in range(len(df)):
                 old_row = df.iloc[i]
                 new_row = edited_df.iloc[i]
+                user_id = new_row["ID"]
+
+                if new_row["使用者狀況"] == "刪除":
+                    if is_admin and user_info["username"] != new_row["使用者帳號"]:
+                        success, msg = delete_user(user_id)
+                        if success:
+                            st.success(f"✅ 已刪除帳號 {new_row['使用者帳號']}")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ 刪除失敗：{msg}")
+                    continue
 
                 if (
                     old_row["使用者狀況"] != new_row["使用者狀況"]
                     or old_row["是否為管理員"] != new_row["是否為管理員"]
                     or old_row["備註"] != new_row["備註"]
                 ):
-                    user_id = new_row["ID"]
                     updated_data = {
                         "note": str(new_row["備註"]) if pd.notna(new_row["備註"]) else "",
                         "is_admin": bool(new_row["是否為管理員"]),
@@ -133,7 +158,6 @@ def run():
             else:
                 st.info("沒有資料變更")
 
-        # 🔐 修改密碼區塊
         selected_row = grid_response["selected_rows"]
         if selected_row:
             selected_user = selected_row[0]
@@ -142,7 +166,6 @@ def run():
                 confirm_pwd = st.text_input("確認新密碼", type="password", key="confirm_pwd")
                 old_pwd = None
 
-                # 若登入者是本人，要驗證舊密碼
                 if user_info["username"] == selected_user["使用者帳號"]:
                     old_pwd = st.text_input("舊密碼", type="password", key="old_pwd")
 
